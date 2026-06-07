@@ -1,0 +1,148 @@
+# Couch Armada
+
+Couch Armada is a small self-hosted server for two-player turn-based games. It
+uses no ads, accounts, analytics, or third-party game service. The first bundled
+game is Battleship.
+
+Game state is stored in `data.json`, which is created on first run. That file can
+include room codes, player display names, game tokens, and in-progress boards, so
+it is intentionally ignored by Git.
+
+## Run
+
+Couch Armada requires Node 16+ and has no package dependencies.
+
+```bash
+cd couch-armada
+node server.js
+```
+
+Expected output:
+
+```text
+Couch Armada running at http://0.0.0.0:8080
+LAN clients can open http://<server-ip>:8080
+```
+
+To test on a local network, find the host IP address and open
+`http://<server-ip>:8080` from another device on the same network. One player
+starts a game and shares the 4-character room code; the second player joins with
+that code.
+
+The port can be changed with:
+
+```bash
+PORT=3000 node server.js
+```
+
+## Test
+
+The smoke test starts the server on a temporary local port and exercises the main
+Battleship API flow.
+
+```bash
+cd couch-armada
+npm test
+```
+
+## Project Layout
+
+```text
+couch-armada/
+  server.js              shared HTTP server, API, rooms, persistence
+  games/
+    index.js             game registry
+    battleship.js        Battleship rules and player-specific views
+  public/
+    index.html           browser UI
+    manifest.json        mobile web app metadata
+  test/
+    smoke.js             zero-dependency HTTP smoke test
+```
+
+## Run As A Service
+
+For a Linux host using systemd, create `/etc/systemd/system/armada.service`:
+
+```ini
+[Unit]
+Description=Couch Armada
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/couch-armada/server.js
+WorkingDirectory=/opt/couch-armada
+Restart=always
+User=armada
+Environment=PORT=8080
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Adjust `ExecStart`, `WorkingDirectory`, and `User` for the deployment target.
+Then enable the service:
+
+```bash
+sudo systemctl enable --now armada
+sudo systemctl status armada
+journalctl -u armada -f
+```
+
+## Remote Access
+
+Remote play requires a reachable HTTPS URL or private network path to the host.
+Common options:
+
+### Cloudflare Tunnel
+
+Cloudflare Tunnel can expose the local server over HTTPS without opening inbound
+ports on the router.
+
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o cloudflared
+chmod +x cloudflared
+sudo mv cloudflared /usr/local/bin/
+
+cloudflared tunnel --url http://localhost:8080
+```
+
+The command prints a temporary `https://...trycloudflare.com` URL. For a stable
+URL, configure a named tunnel in Cloudflare.
+
+### Tailscale
+
+Tailscale can make the server reachable only to devices in the same tailnet. This
+avoids public inbound ports, but each player device needs Tailscale installed and
+signed in.
+
+### Port Forwarding And Dynamic DNS
+
+A router port forward plus dynamic DNS also works. This is the most exposed
+option and should only be used when the host and router are configured
+appropriately.
+
+## Install As A Mobile Web App
+
+Open the server URL in a mobile browser and use the browser's "Add to Home
+screen" action. HTTPS is recommended for the best install behavior.
+
+## Adding Games
+
+The server keeps room, turn, identity, and persistence plumbing separate from game
+rules. A game module in `games/` exports these hooks:
+
+- `init()`
+- `validateSetup(state, player, setup)`
+- `applyMove(state, player, move)`
+- `viewFor(state, player)`
+
+The `games/battleship.js` module is the reference implementation. Add another
+game by creating a module in `games/`, registering it in `games/index.js`, and
+adding the matching UI in `public/index.html`.
+
+## Notes
+
+- Battleship uses one shot per turn with strict alternation.
+- To reset local state, stop the server, delete `data.json`, and start it again.
+- Rooms are two-player only; a full room rejects additional joins.

@@ -1,0 +1,14 @@
+{
+  "name": "couch-armada",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted two-player turn-based games.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
