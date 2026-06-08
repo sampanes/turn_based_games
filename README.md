@@ -2,7 +2,8 @@
 
 Couch Armada is a small self-hosted server for two-player turn-based games. It
 uses no ads, accounts, analytics, or third-party game service. The first bundled
-game is Battleship.
+game is Battleship. The mobile-first browser client also has a static "play the
+computer" mode that can run on GitHub Pages.
 
 Game state is stored in `data.json`, which is created on first run. That file can
 include room codes, player display names, game tokens, and in-progress boards, so
@@ -51,10 +52,12 @@ npm test
 couch-armada/
   server.js              shared HTTP server, API, rooms, persistence
   games/
-    index.js             game registry
-    battleship.js        Battleship rules and player-specific views
+    index.js             server game registry
+    battleship.js        server wrapper around the shared Battleship rules
   public/
-    index.html           browser UI
+    index.html           browser UI with online and computer modes
+    games/
+      battleship.js      shared Battleship rules used by browser and server
     manifest.json        mobile web app metadata
   test/
     smoke.js             zero-dependency HTTP smoke test
@@ -127,19 +130,43 @@ appropriately.
 Open the server URL in a mobile browser and use the browser's "Add to Home
 screen" action. HTTPS is recommended for the best install behavior.
 
+## Static GitHub Pages / Computer Opponent Mode
+
+The app can be hosted as static files for solo play. Publish the contents of
+`couch-armada/public/` to GitHub Pages and keep the `games/` directory beside
+`index.html`. The "Play the computer" button stores the whole room in browser
+`localStorage`, so it works without a server.
+
+Solo mode deliberately calls the same game hooks as the HTTP server:
+
+- `init()` creates the room state.
+- `validateSetup()` validates and commits both fleets.
+- `applyMove()` applies both human and computer turns.
+- `viewFor()` renders the player-specific board.
+- Optional `computerSetup()` and `computerMove()` hooks let static solo mode set up and take a basic opponent turn without duplicating rule logic.
+
+That keeps turn order, hidden information, win conditions, and move validation
+aligned with the future online server mode instead of copying game rules into the
+client.
+
 ## Adding Games
 
 The server keeps room, turn, identity, and persistence plumbing separate from game
-rules. A game module in `games/` exports these hooks:
+rules. A shared game module in `public/games/` exports these hooks in a browser
+and Node-compatible format:
 
 - `init()`
 - `validateSetup(state, player, setup)`
 - `applyMove(state, player, move)`
 - `viewFor(state, player)`
 
-The `games/battleship.js` module is the reference implementation. Add another
-game by creating a module in `games/`, registering it in `games/index.js`, and
-adding the matching UI in `public/index.html`.
+The `public/games/battleship.js` module is the reference implementation. Add
+another game by creating a module in `public/games/`, registering it for the
+server in `games/index.js`, adding a `<script>` tag for static play, and adding
+the matching mobile-first UI in `public/index.html`. Expose
+`computerSetup()` and `computerMove()` when the game supports GitHub Pages solo
+play so the local adapter can remain generic while each game owns its own basic
+opponent behavior.
 
 ## Notes
 

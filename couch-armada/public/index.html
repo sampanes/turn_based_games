@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Armada">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<link rel="icon" href="/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <title>Couch Armada - Battleship</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -155,7 +155,7 @@
 <div class="wrap">
   <header>
     <h1>COUCH ARMADA</h1>
-    <div class="tag">Battleship - two captains, no spectators</div>
+    <div class="tag">Turn-based games - online or solo</div>
   </header>
 
   <!-- HOME -->
@@ -163,7 +163,9 @@
     <h2>New engagement</h2>
     <label for="name1">Your call sign</label>
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
-    <button class="primary mt" style="width:100%" onclick="createGame()">Start a game</button>
+    <button class="primary mt" style="width:100%" onclick="createGame()">Start an online game</button>
+    <button class="mt" style="width:100%" onclick="createComputerGame()">Play the computer</button>
+    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the same Battleship rules module as the server.</p>
     <div class="divider">- OR -</div>
     <h2 style="margin-top:6px">Join a game</h2>
     <label for="joinCode">Game code</label>
@@ -216,10 +218,11 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="games/battleship.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const S = 10;
-let session = null;            // {room, token, you, game}
+let session = null;            // {room, token, you, game, mode}
 let orient = 'H';              // H | V
 let placedShips = [];          // [{name,size,cells:[]}]
 let selectedShip = null;       // fleet index being placed
@@ -230,7 +233,11 @@ let lastView = null;
 // ---- browser session persistence
 function loadSession() { try { return JSON.parse(localStorage.getItem('armada')); } catch { return null; } }
 function setSession(s) { session = s; localStorage.setItem('armada', JSON.stringify(s)); }
-function clearSession() { session = null; localStorage.removeItem('armada'); }
+function clearSession() {
+  if (session && session.mode === 'computer') localStorage.removeItem(`armada-solo-${session.room}`);
+  session = null;
+  localStorage.removeItem('armada');
+}
 
 function show(id) {
   ['home','lobby','placement','battle'].forEach(s => $(s).classList.toggle('hidden', s !== id));
@@ -240,7 +247,83 @@ function toast(msg) {
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
 }
 
+function availableGames() { return window.CouchArmadaGames || {}; }
+function soloKey(room) { return `armada-solo-${room}`; }
+function getSoloRoom() { return JSON.parse(localStorage.getItem(soloKey(session.room))); }
+function putSoloRoom(room) { localStorage.setItem(soloKey(room.code), JSON.stringify(room)); }
+function soloToken() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+function soloRoomCode() { return 'CPU' + Math.random().toString(36).slice(2, 6).toUpperCase(); }
+
+function computerSetup(game) {
+  if (typeof game.computerSetup !== 'function') throw new Error('This game does not have a computer setup yet.');
+  return game.computerSetup();
+}
+
+function computerMove(room) {
+  if (typeof room.game.computerMove !== 'function') throw new Error('This game does not have a computer opponent yet.');
+  return room.game.computerMove(room.state, 'B');
+}
+
+function advanceComputer(room) {
+  if (room.state.phase === 'battle' && room.state.turn === 'B') {
+    const move = computerMove(room);
+    if (move) room.game.applyMove(room.state, 'B', move);
+  }
+}
+
+function soloApi(path, method, body) {
+  const url = new URL(path, location.href);
+  const route = url.pathname;
+  if (route.endsWith('/api/create') && method === 'POST') {
+    const gameName = body.game || 'battleship';
+    const game = availableGames()[gameName];
+    if (!game) throw new Error('That game is not available for solo play yet.');
+    const code = soloRoomCode();
+    const tok = soloToken();
+    const room = {
+      code, gameName, game, humanToken: tok,
+      humanName: body.name || 'Player 1', computerName: 'Computer',
+      state: game.init(),
+    };
+    putSoloRoom({ ...room, game: undefined });
+    return { room: code, token: tok, you: 'A', game: gameName, mode: 'computer' };
+  }
+  const room = getSoloRoom();
+  if (!room || room.humanToken !== (body && body.token || url.searchParams.get('token'))) throw new Error('Not in this game.');
+  room.game = availableGames()[room.gameName];
+  if (route.endsWith('/api/setup') && method === 'POST') {
+    const err = room.game.validateSetup(room.state, 'A', body.ships);
+    if (err) throw new Error(err);
+    const cpuErr = room.game.validateSetup(room.state, 'B', computerSetup(room.game));
+    if (cpuErr) throw new Error(cpuErr);
+    advanceComputer(room);
+    putSoloRoom({ ...room, game: undefined });
+    return { ok: true };
+  }
+  if (route.endsWith('/api/move') && method === 'POST') {
+    const err = room.game.applyMove(room.state, 'A', body.move);
+    if (err) throw new Error(err);
+    advanceComputer(room);
+    putSoloRoom({ ...room, game: undefined });
+    return { ok: true };
+  }
+  if (route.endsWith('/api/state') && method === 'GET') {
+    advanceComputer(room);
+    putSoloRoom({ ...room, game: undefined });
+    return {
+      game: room.gameName,
+      you: 'A',
+      youName: room.humanName,
+      opponentJoined: true,
+      opponentName: room.computerName,
+      view: room.game.viewFor(room.state, 'A'),
+    };
+  }
+  throw new Error('Unknown solo endpoint.');
+}
+
 async function api(path, method, body) {
+  if (session && session.mode === 'computer') return soloApi(path, method, body || {});
   const opt = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opt.body = JSON.stringify(body);
   const res = await fetch(path, opt);
@@ -253,9 +336,18 @@ async function createGame() {
   try {
     const name = $('name1').value.trim() || 'Player 1';
     const d = await api('/api/create', 'POST', { game: 'battleship', name });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online' });
     enterRoom();
   } catch (e) { toast(e.message); }
+}
+async function createComputerGame() {
+  try {
+    const name = $('name1').value.trim() || 'Player 1';
+    session = { mode: 'computer' };
+    const d = await api('/api/create', 'POST', { game: 'battleship', name });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer' });
+    enterRoom();
+  } catch (e) { clearSession(); toast(e.message); }
 }
 async function joinGame() {
   try {
@@ -263,7 +355,7 @@ async function joinGame() {
     if (room.length !== 4) return toast('Codes are 4 letters/numbers.');
     const name = $('name2').value.trim() || 'Player 2';
     const d = await api('/api/join', 'POST', { room, name });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online' });
     enterRoom();
   } catch (e) { toast(e.message); }
 }
