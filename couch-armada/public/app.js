@@ -18,7 +18,7 @@ function clearSession() {
 }
 
 function show(id) {
-  ['home','lobby','placement','battle','connectFour'].forEach(section => {
+  ['home','lobby','placement','battle','connectFour','oneCard'].forEach(section => {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
   });
@@ -145,6 +145,11 @@ function render(d) {
     renderConnectFour(d, v);
     return;
   }
+  if ((v.ui || (meta && meta.ui)) === 'onecard') {
+    show('oneCard');
+    renderOneCard(d, v);
+    return;
+  }
 
   if (v.phase === 'placing') {
     if (v.youPlaced) {
@@ -169,6 +174,8 @@ function resetGameUi() {
   $('myGrid').innerHTML = '';
   $('connectColumns').innerHTML = '';
   $('connectBoard').innerHTML = '';
+  $('oneCardOpponents').innerHTML = '';
+  $('oneCardHand').innerHTML = '';
 }
 
 // ---------------- placement ----------------
@@ -439,6 +446,119 @@ async function dropConnectDisc(c) {
   } catch (e) { toast(e.message); }
 }
 
+// ---------------- one-card ----------------
+function oneCardLabel(card) {
+  if (!card) return '—';
+  if (card.kind === 'wild4') return '+4';
+  if (card.kind === 'wild') return 'WILD';
+  if (card.kind === 'draw2') return '+2';
+  if (card.kind === 'reverse') return '↺';
+  if (card.kind === 'skip') return '⊘';
+  return card.rank;
+}
+function oneCardColor(card, fallback) {
+  if (!card) return fallback || 'red';
+  return card.color === 'wild' ? (fallback || 'wild') : card.color;
+}
+function oneCardName(card) {
+  if (!card) return 'Empty discard';
+  const color = card.color === 'wild' ? 'Wild' : card.color;
+  return `${color} ${oneCardLabel(card)}`;
+}
+function oneCardCanPlay(v, card) {
+  return v.phase === 'battle' && v.turn === session.you && v.legalCardIds.includes(card.id);
+}
+function renderOneCard(d, v) {
+  const players = v.players || [];
+  const me = players.find(player => player.you) || { name: d.youName, cards: (v.hand || []).length };
+  const opponents = $('oneCardOpponents');
+  opponents.innerHTML = '';
+  players.filter(player => !player.you).forEach(player => {
+    const tile = document.createElement('div');
+    tile.className = 'one-opponent' + (v.turn === player.slot ? ' active' : '');
+    tile.innerHTML = `<span>${player.name}</span><strong>${player.cards}</strong>`;
+    opponents.appendChild(tile);
+  });
+
+  $('oneCardCode').textContent = session.room;
+  $('oneCardCodeWrap').classList.toggle('hidden', v.phase !== 'lobby');
+  $('oneCardStart').classList.toggle('hidden', v.phase !== 'lobby' || !v.canStart);
+  $('oneCardDraw').disabled = !(v.phase === 'battle' && v.turn === session.you);
+  $('oneCardCount').textContent = `${me.cards || (v.hand || []).length} card${(me.cards || (v.hand || []).length) === 1 ? '' : 's'}`;
+  $('oneCardDirection').textContent = v.direction === -1 ? 'counter-clockwise' : 'clockwise';
+  $('oneCardDeckCount').textContent = `${v.drawCount || 0} in draw pile`;
+
+  const top = v.topCard;
+  const discard = $('oneCardDiscard');
+  discard.className = `one-card-card discard ${oneCardColor(top, v.currentColor)}`;
+  discard.innerHTML = `<span>${oneCardLabel(top)}</span><small>${oneCardName(top)}</small>`;
+
+  const colorDots = $('oneCardColorDots');
+  colorDots.innerHTML = '';
+  ['red', 'gold', 'green', 'blue'].forEach(color => {
+    const dot = document.createElement('span');
+    dot.className = `color-dot ${color}` + (v.currentColor === color ? ' active' : '');
+    colorDots.appendChild(dot);
+  });
+
+  const hand = $('oneCardHand');
+  hand.innerHTML = '';
+  (v.hand || []).forEach(card => {
+    const btn = document.createElement('button');
+    btn.className = `one-card-card ${oneCardColor(card)}` + (oneCardCanPlay(v, card) ? ' playable' : '');
+    btn.disabled = !oneCardCanPlay(v, card);
+    btn.innerHTML = `<span>${oneCardLabel(card)}</span><small>${card.color === 'wild' ? 'Wild' : card.color}</small>`;
+    btn.onclick = () => playOneCard(card);
+    hand.appendChild(btn);
+  });
+
+  const banner = $('oneCardStatus');
+  if (v.phase === 'lobby') {
+    banner.className = 'status them';
+    banner.textContent = v.canStart ? 'Ready - start now or let more players join.' : `Share the code. One-Card starts with ${v.minPlayers}+ players.`;
+  } else if (v.phase === 'over') {
+    const won = v.winner === d.you;
+    const winner = players.find(player => player.slot === v.winner);
+    banner.className = 'status ' + (won ? 'win' : 'lose');
+    banner.textContent = won ? 'VICTORY - you emptied your hand' : `${winner ? winner.name : 'A rival'} emptied their hand.`;
+  } else if (v.turn === d.you) {
+    banner.className = 'status you';
+    banner.textContent = v.legalCardIds.length ? 'YOUR PLAY - match color, number, or symbol' : 'No legal cards - draw one';
+  } else {
+    const current = players.find(player => player.slot === v.turn);
+    banner.className = 'status them';
+    banner.textContent = `${current ? current.name : 'A rival'} is choosing a card...`;
+  }
+  $('oneCardLast').textContent = v.lastAction ? v.lastAction.text : 'First to empty their hand wins.';
+}
+function chooseWildColor() {
+  const color = prompt('Choose a color: red, gold, green, or blue', lastView.currentColor || 'red');
+  const clean = String(color || '').toLowerCase();
+  return ['red', 'gold', 'green', 'blue'].includes(clean) ? clean : 'red';
+}
+async function startOneCard() {
+  try {
+    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { action: 'start' } });
+    poll();
+  } catch (e) { toast(e.message); }
+}
+async function playOneCard(card) {
+  if (!oneCardCanPlay(lastView, card)) { toast('That card is not legal right now.'); return; }
+  const move = { action: 'play', cardId: card.id };
+  if (card.color === 'wild') move.color = chooseWildColor();
+  try {
+    await api('/api/move', 'POST', { room: session.room, token: session.token, move });
+    poll();
+  } catch (e) { toast(e.message); }
+}
+async function drawOneCard() {
+  if (!lastView || lastView.ui !== 'onecard' || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
+  try {
+    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { action: 'draw' } });
+    poll();
+  } catch (e) { toast(e.message); }
+}
+
 // ---------------- boot ----------------
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
@@ -448,6 +568,7 @@ document.addEventListener('keydown', e => {
   if (e.key.toLowerCase() === 'r' && !$('placement').classList.contains('hidden')) toggleOrient();
   const n = Number(e.key);
   if (n >= 1 && n <= 7 && lastView && lastView.ui === 'connectfour') dropConnectDisc(n - 1);
+  if (e.key.toLowerCase() === 'd' && lastView && lastView.ui === 'onecard') drawOneCard();
 });
 
 populateGameSelect();

@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
-<title>Couch Armada - Battleship</title>
+<title>Couch Armada - Turn-based games</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Saira+Stencil+One&display=swap" rel="stylesheet">
@@ -178,6 +178,41 @@
   .disc-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   .disc-dot.A { background: #ffcf52; box-shadow: 0 0 10px rgba(255,179,71,.6); }
   .disc-dot.B { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.6); }
+
+  /* one-card */
+  .one-card-panel { overflow: hidden; }
+  .one-card-table { display: grid; gap: 14px; }
+  .one-card-code { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed rgba(255,179,71,.45); border-radius: 12px; color: var(--amber); background: rgba(255,179,71,.06); }
+  .one-card-code strong { font-size: 24px; letter-spacing: 5px; }
+  .one-opponents { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .one-opponent { min-height: 58px; padding: 9px; border: 1px solid rgba(207,233,236,.12); border-radius: 14px; background: rgba(6,20,27,.64); color: var(--mute); display: flex; flex-direction: column; justify-content: space-between; }
+  .one-opponent.active { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 18px rgba(255,179,71,.12); }
+  .one-opponent span { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .one-opponent strong { font-size: 22px; }
+  .one-card-center { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; padding: 14px; border-radius: 22px; background: radial-gradient(circle at 50% 30%, rgba(52,231,196,.10), rgba(6,20,27,.7) 65%); border: 1px solid rgba(52,231,196,.18); }
+  .one-card-card { aspect-ratio: 5 / 7; min-height: 112px; border-radius: 18px; border: 2px solid rgba(255,255,255,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #fff; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.45); box-shadow: inset 0 0 0 5px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); }
+  .one-card-card span { font-size: clamp(25px, 11vw, 44px); line-height: 1; }
+  .one-card-card small { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .one-card-card.red { background: linear-gradient(145deg, #ff695f, #a91628); }
+  .one-card-card.gold { background: linear-gradient(145deg, #ffd36b, #c27a00); }
+  .one-card-card.green { background: linear-gradient(145deg, #4ee08f, #087341); }
+  .one-card-card.blue { background: linear-gradient(145deg, #58b7ff, #1050b7); }
+  .one-card-card.wild { background: conic-gradient(from 45deg, #ff5b51, #ffcf52, #34e78a, #58b7ff, #ff5b51); }
+  button.one-card-card { padding: 8px; transition: transform .12s ease, filter .12s ease; }
+  button.one-card-card.playable { transform: translateY(-8px); filter: saturate(1.2) brightness(1.08); border-color: #fff; }
+  button.one-card-card:disabled { cursor: not-allowed; opacity: .52; filter: grayscale(.18); }
+  .one-card-deck { background: linear-gradient(145deg, #142d3a, #06141b); color: var(--sonar); }
+  .one-card-meta { display: grid; gap: 8px; color: var(--mute); font-size: 12px; }
+  .one-card-colors { display: flex; gap: 7px; justify-content: center; }
+  .color-dot { width: 18px; height: 18px; border-radius: 50%; opacity: .35; border: 2px solid rgba(255,255,255,.35); }
+  .color-dot.active { opacity: 1; transform: scale(1.15); box-shadow: 0 0 14px currentColor; }
+  .color-dot.red { background: #ff5b51; color: #ff5b51; } .color-dot.gold { background: #ffcf52; color: #ffcf52; } .color-dot.green { background: #34e78a; color: #34e78a; } .color-dot.blue { background: #58b7ff; color: #58b7ff; }
+  .one-card-hand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 8px; }
+  .one-card-hand .one-card-card { min-height: 132px; }
+  .one-card-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .one-card-last { min-height: 20px; text-align: center; color: var(--mute); font-size: 12px; }
+  @media (min-width: 520px) { .one-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
   .hidden { display: none !important; }
 </style>
 </head>
@@ -197,7 +232,7 @@
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
     <button class="primary mt" style="width:100%" onclick="createGame()">Start an online game</button>
     <button class="mt" style="width:100%" onclick="createComputerGame()">Play the computer</button>
-    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the same Battleship rules module as the server.</p>
+    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the the same rules modules as the server. One-Card solo seats you against three simple bots.</p>
     <div class="divider">- OR -</div>
     <h2 style="margin-top:6px">Join a game</h2>
     <label for="joinCode">Game code</label>
@@ -262,6 +297,38 @@
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
+
+  <!-- ONE-CARD -->
+  <section id="oneCard" class="card one-card-panel hidden">
+    <div id="oneCardStatus" class="status">...</div>
+    <div class="one-card-table mt">
+      <div id="oneCardCodeWrap" class="one-card-code hidden">
+        <span>Invite code</span>
+        <strong id="oneCardCode">....</strong>
+      </div>
+      <button id="oneCardStart" class="primary hidden" style="width:100%" onclick="startOneCard()">Start One-Card</button>
+      <div class="one-opponents" id="oneCardOpponents"></div>
+      <div class="one-card-center">
+        <div class="one-card-card one-card-deck"><span>▧</span><small id="oneCardDeckCount">0 in draw pile</small></div>
+        <div id="oneCardDiscard" class="one-card-card discard red"><span>—</span><small>Discard</small></div>
+      </div>
+      <div class="one-card-meta">
+        <div class="one-card-colors" id="oneCardColorDots"></div>
+        <div class="row">
+          <span id="oneCardCount">0 cards</span>
+          <span id="oneCardDirection" style="text-align:right">clockwise</span>
+        </div>
+        <div id="oneCardLast" class="one-card-last">First to empty their hand wins.</div>
+      </div>
+      <div class="one-card-toolbar">
+        <button id="oneCardDraw" onclick="drawOneCard()">Draw / pass</button>
+        <button class="ghost" onclick="copyRoomCode()">Copy code</button>
+      </div>
+      <div id="oneCardHand" class="one-card-hand"></div>
+    </div>
+    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+  </section>
+
   <div class="footnote" id="foot"></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -269,6 +336,7 @@
 <script src="games/registry.js"></script>
 <script src="games/battleship.js"></script>
 <script src="games/connectfour.js"></script>
+<script src="games/onecard.js"></script>
 <script src="solo.js"></script>
 <script src="app.js"></script>
 
