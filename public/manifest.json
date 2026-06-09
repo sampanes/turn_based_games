@@ -1,7 +1,7 @@
 {
-  "name": "Couch Armada",
-  "short_name": "Armada",
-  "description": "Self-hosted turn-based games for two - no ads, no accounts.",
+  "name": "Turn-Based Games",
+  "short_name": "TBG",
+  "description": "Static solo and self-hosted multiplayer turn-based games - no ads, no accounts.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,5 +1,5 @@
 (function registerSoloClient(root) {
-  function soloKey(room) { return `armada-solo-${room}`; }
+  function soloKey(room) { return `turn-based-games-solo-${room}`; }
   function soloToken() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
   function soloRoomCode() { return 'CPU' + Math.random().toString(36).slice(2, 6).toUpperCase(); }
   function loadRoom(session) { return JSON.parse(root.localStorage.getItem(soloKey(session.room))); }
@@ -117,5 +117,5 @@
     throw new Error('Unknown solo endpoint.');
   }
 
-  root.CouchArmadaSolo = { handle, clearRoom };
+  root.TurnBasedGamesSolo = { handle, clearRoom };
 })(window);

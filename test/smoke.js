@@ -6,7 +6,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
-const dataFile = path.join(os.tmpdir(), `couch-armada-smoke-${process.pid}.json`);
+const dataFile = path.join(os.tmpdir(), `turn-based-games-smoke-${process.pid}.json`);
 
 function request(port, method, pathname, body) {
   const payload = body ? JSON.stringify(body) : null;
@@ -79,7 +79,7 @@ async function main() {
   try {
     const page = await request(port, 'GET', '/', null);
     assert.strictEqual(page.status, 200);
-    assert.match(page.raw, /COUCH ARMADA/);
+    assert.match(page.raw, /TURN-BASED GAMES/);
     assert.match(page.raw, /connectFour/);
     assert.strictEqual((page.raw.match(/<script src="app\.js"><\/script>/g) || []).length, 1);
 
