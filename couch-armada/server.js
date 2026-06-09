@@ -58,6 +58,11 @@ function playerOf(room, tok) {
   return null;
 }
 
+function cleanName(value, fallback) {
+  const name = String(value || '').trim().slice(0, 32);
+  return name || fallback;
+}
+
 // ----------------------------------------------------------------------- routes
 function send(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json' });
@@ -69,12 +74,14 @@ function handleApi(req, res, body) {
   const route = url.pathname;
 
   if (route === '/api/create' && req.method === 'POST') {
-    const type = (body.game && games[body.game]) ? body.game : 'battleship';
+    const requested = body.game || 'battleship';
+    if (!games[requested]) return send(res, 400, { error: 'Unknown game.' });
+    const type = requested;
     const code = roomCode();
     const tok = token();
     db.rooms[code] = {
       code, game: type, createdAt: Date.now(),
-      players: { A: { token: tok, name: body.name || 'Player 1' }, B: null },
+      players: { A: { token: tok, name: cleanName(body.name, 'Player 1') }, B: null },
       state: games[type].init(),
     };
     save();
@@ -86,7 +93,7 @@ function handleApi(req, res, body) {
     if (!room) return send(res, 404, { error: 'No game with that code.' });
     if (room.players.B) return send(res, 409, { error: 'That game is already full.' });
     const tok = token();
-    room.players.B = { token: tok, name: body.name || 'Player 2' };
+    room.players.B = { token: tok, name: cleanName(body.name, 'Player 2') };
     save();
     return send(res, 200, { room: room.code, token: tok, you: 'B', game: room.game });
   }
@@ -139,10 +146,16 @@ const MIME = {
   '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
 };
 function serveStatic(req, res) {
-  let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let p;
+  try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+  catch { res.writeHead(400); return res.end('Bad request'); }
   if (p === '/') p = '/index.html';
-  const filePath = path.normalize(path.join(PUBLIC_DIR, p));
-  if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end('no'); }
+  const filePath = path.resolve(PUBLIC_DIR, '.' + p);
+  const relative = path.relative(PUBLIC_DIR, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    res.writeHead(403);
+    return res.end('Forbidden');
+  }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream' });

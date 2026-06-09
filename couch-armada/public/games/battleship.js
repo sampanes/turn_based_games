@@ -210,8 +210,4 @@ if (typeof window !== 'undefined') {
     window.CouchArmadaGames = window.CouchArmadaGames || {};
     window.CouchArmadaGames.battleship = battleship;
   }
-if (typeof module !== 'undefined' && module.exports) module.exports = battleship;
-if (typeof window !== 'undefined') {
-  window.CouchArmadaGames = window.CouchArmadaGames || {};
-  window.CouchArmadaGames.battleship = battleship;
 }

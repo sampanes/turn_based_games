@@ -80,6 +80,14 @@ async function main() {
     const page = await request(port, 'GET', '/', null);
     assert.strictEqual(page.status, 200);
     assert.match(page.raw, /COUCH ARMADA/);
+    assert.match(page.raw, /connectFour/);
+    assert.strictEqual((page.raw.match(/<script src="app\.js"><\/script>/g) || []).length, 1);
+
+    const traversal = await request(port, 'GET', '/..%2Fpackage.json', null);
+    assert.strictEqual(traversal.status, 403);
+
+    const unknownGame = await request(port, 'POST', '/api/create', { game: 'not-a-game' });
+    assert.strictEqual(unknownGame.status, 400);
 
     const created = await request(port, 'POST', '/api/create', { game: 'battleship', name: 'Alpha' });
     assert.strictEqual(created.status, 200);
