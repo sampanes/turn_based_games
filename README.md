@@ -3,6 +3,7 @@
 Couch Armada is a small self-hosted server for two-player turn-based games. It
 uses no ads, accounts, analytics, or third-party game service. The first bundled
 games are Battleship and Connect Four. The mobile-first browser client also has a static "play the
+game is Battleship. The mobile-first browser client also has a static "play the
 computer" mode that can run on GitHub Pages.
 
 Live GitHub Pages build: https://sampanes.github.io/turn-based-games/
