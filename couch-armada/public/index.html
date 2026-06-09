@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Armada">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<link rel="icon" href="/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <title>Couch Armada - Battleship</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -65,11 +65,11 @@
   h2 { font-size: 15px; letter-spacing: 1px; text-transform: uppercase; color: var(--sonar); margin: 0 0 12px; }
   p.lede { color: var(--mute); font-size: 13px; line-height: 1.6; margin: 0 0 14px; }
   label { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mute); margin: 12px 0 6px; }
-  input {
+  input, select {
     width: 100%; background: var(--abyss); border: 1px solid var(--line); color: var(--ink);
     font-family: inherit; font-size: 16px; padding: 12px 14px; border-radius: 9px; letter-spacing: 1px;
   }
-  input:focus { outline: none; border-color: var(--sonar-dim); box-shadow: 0 0 0 3px rgba(52,231,196,.12); }
+  input:focus, select:focus { outline: none; border-color: var(--sonar-dim); box-shadow: 0 0 0 3px rgba(52,231,196,.12); }
   input.code { text-transform: uppercase; font-size: 22px; letter-spacing: 6px; text-align: center; }
   button {
     font-family: inherit; cursor: pointer; border-radius: 9px; font-size: 14px; letter-spacing: 1px;
@@ -155,15 +155,19 @@
 <div class="wrap">
   <header>
     <h1>COUCH ARMADA</h1>
-    <div class="tag">Battleship - two captains, no spectators</div>
+    <div class="tag">Turn-based games - online or solo</div>
   </header>
 
   <!-- HOME -->
   <section id="home" class="card hidden">
     <h2>New engagement</h2>
+    <label for="gameSelect">Game</label>
+    <select id="gameSelect"></select>
     <label for="name1">Your call sign</label>
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
-    <button class="primary mt" style="width:100%" onclick="createGame()">Start a game</button>
+    <button class="primary mt" style="width:100%" onclick="createGame()">Start an online game</button>
+    <button class="mt" style="width:100%" onclick="createComputerGame()">Play the computer</button>
+    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the same Battleship rules module as the server.</p>
     <div class="divider">- OR -</div>
     <h2 style="margin-top:6px">Join a game</h2>
     <label for="joinCode">Game code</label>
@@ -216,276 +220,10 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script>
-const $ = id => document.getElementById(id);
-const S = 10;
-let session = null;            // {room, token, you, game}
-let orient = 'H';              // H | V
-let placedShips = [];          // [{name,size,cells:[]}]
-let selectedShip = null;       // fleet index being placed
-let fleetDef = [];             // from server view
-let pollTimer = null;
-let lastView = null;
+<script src="games/registry.js"></script>
+<script src="games/battleship.js"></script>
+<script src="solo.js"></script>
+<script src="app.js"></script>
 
-// ---- browser session persistence
-function loadSession() { try { return JSON.parse(localStorage.getItem('armada')); } catch { return null; } }
-function setSession(s) { session = s; localStorage.setItem('armada', JSON.stringify(s)); }
-function clearSession() { session = null; localStorage.removeItem('armada'); }
-
-function show(id) {
-  ['home','lobby','placement','battle'].forEach(s => $(s).classList.toggle('hidden', s !== id));
-}
-function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1800);
-}
-
-async function api(path, method, body) {
-  const opt = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opt.body = JSON.stringify(body);
-  const res = await fetch(path, opt);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-  return data;
-}
-
-async function createGame() {
-  try {
-    const name = $('name1').value.trim() || 'Player 1';
-    const d = await api('/api/create', 'POST', { game: 'battleship', name });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game });
-    enterRoom();
-  } catch (e) { toast(e.message); }
-}
-async function joinGame() {
-  try {
-    const room = $('joinCode').value.trim().toUpperCase();
-    if (room.length !== 4) return toast('Codes are 4 letters/numbers.');
-    const name = $('name2').value.trim() || 'Player 2';
-    const d = await api('/api/join', 'POST', { room, name });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game });
-    enterRoom();
-  } catch (e) { toast(e.message); }
-}
-function leaveGame() {
-  if (!confirm('Leave this game? This clears the saved local session for this device.')) return;
-  clearSession(); stopPoll(); resetPlacement(); show('home');
-}
-
-function enterRoom() { startPoll(); poll(); }
-
-function startPoll() { stopPoll(); pollTimer = setInterval(poll, 3000); }
-function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
-
-async function poll() {
-  if (!session) return;
-  try {
-    const d = await api(`/api/state?room=${session.room}&token=${session.token}`, 'GET');
-    render(d);
-  } catch (e) {
-    if (/No such game|Not in this game/.test(e.message)) { clearSession(); stopPoll(); show('home'); }
-  }
-}
-
-function render(d) {
-  const v = d.view; lastView = v; fleetDef = v.fleet;
-  $('foot').textContent = `Game ${session.room} - ${d.youName}` + (d.opponentName ? ` vs ${d.opponentName}` : '');
-
-  if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; return; }
-
-  if (v.phase === 'placing') {
-    if (v.youPlaced) {
-      show('placement'); document.querySelectorAll('#placement .grid, #placement .fleet, #placement .row, #readyBtn, #placeHint').forEach(el => el.classList.add('hidden'));
-      $('placeWait').classList.remove('hidden');
-    } else {
-      show('placement'); $('placeWait').classList.add('hidden');
-      document.querySelectorAll('#placement .grid, #placement .fleet, #placement .row, #readyBtn, #placeHint').forEach(el => el.classList.remove('hidden'));
-      if (!$('placeGrid').children.length) initPlacement();
-    }
-    return;
-  }
-
-  show('battle');
-  renderBattle(d, v);
-}
-
-// ---------------- placement ----------------
-function resetPlacement() { placedShips = []; selectedShip = null; orient = 'H'; $('placeGrid').innerHTML = ''; $('fleetList').innerHTML = ''; }
-
-function initPlacement() {
-  resetPlacement();
-  const g = $('placeGrid');
-  for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
-    const cell = document.createElement('div');
-    cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
-    cell.onclick = () => placeAt(r, c);
-    g.appendChild(cell);
-  }
-  // default selection = first ship
-  selectedShip = 0;
-  renderFleetList(); renderPlaceGrid();
-}
-
-function renderFleetList() {
-  const list = $('fleetList'); list.innerHTML = '';
-  fleetDef.forEach((s, i) => {
-    const placed = placedShips.find(p => p.name === s.name);
-    const row = document.createElement('div');
-    row.className = 'ship-row' + (i === selectedShip ? ' active' : '') + (placed ? ' done' : '');
-    const pips = Array.from({ length: s.size }, () => '<span class="pip"></span>').join('');
-    row.innerHTML = `<span class="ship-name">${s.name}</span>
-      <span style="display:flex;align-items:center;gap:10px">
-        <span class="pips">${pips}</span>
-        ${placed ? '<span class="check">ok</span>' : `<span style="color:var(--mute);font-size:12px">${s.size}</span>`}
-      </span>`;
-    row.onclick = () => {
-      if (placed) { placedShips = placedShips.filter(p => p.name !== s.name); }
-      selectedShip = i; renderFleetList(); renderPlaceGrid();
-    };
-    list.appendChild(row);
-  });
-  $('readyBtn').disabled = placedShips.length !== fleetDef.length;
-}
-
-function shipCells(r, c, size) {
-  const cells = [];
-  for (let i = 0; i < size; i++) cells.push(orient === 'H' ? `${r},${c + i}` : `${r + i},${c}`);
-  return cells;
-}
-function occupiedSet() { const s = new Set(); placedShips.forEach(p => p.cells.forEach(x => s.add(x))); return s; }
-
-function placeAt(r, c) {
-  if (selectedShip == null) return;
-  const def = fleetDef[selectedShip];
-  if (placedShips.find(p => p.name === def.name)) return; // already placed; tap list to pull back
-  const cells = shipCells(r, c, def.size);
-  const occ = occupiedSet();
-  for (const cell of cells) {
-    const [rr, cc] = cell.split(',').map(Number);
-    if (rr < 0 || rr >= S || cc < 0 || cc >= S) { toast('Off the board.'); return; }
-    if (occ.has(cell)) { toast('Ships cannot overlap.'); return; }
-  }
-  placedShips.push({ name: def.name, size: def.size, cells });
-  // advance to next unplaced
-  const nextIdx = fleetDef.findIndex(s => !placedShips.find(p => p.name === s.name));
-  selectedShip = nextIdx === -1 ? null : nextIdx;
-  renderFleetList(); renderPlaceGrid();
-}
-
-function renderPlaceGrid() {
-  const occ = occupiedSet();
-  document.querySelectorAll('#placeGrid .cell').forEach(cell => {
-    const key = `${cell.dataset.r},${cell.dataset.c}`;
-    cell.className = 'cell' + (occ.has(key) ? ' ship' : '');
-  });
-}
-
-function toggleOrient() {
-  orient = orient === 'H' ? 'V' : 'H';
-  $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
-}
-
-function randomize() {
-  placedShips = [];
-  for (const def of fleetDef) {
-    let ok = false, tries = 0;
-    while (!ok && tries++ < 500) {
-      const o = Math.random() < 0.5 ? 'H' : 'V';
-      const r = Math.floor(Math.random() * S), c = Math.floor(Math.random() * S);
-      const cells = [];
-      for (let i = 0; i < def.size; i++) cells.push(o === 'H' ? `${r},${c + i}` : `${r + i},${c}`);
-      const occ = occupiedSet();
-      ok = cells.every(cell => {
-        const [rr, cc] = cell.split(',').map(Number);
-        return rr >= 0 && rr < S && cc >= 0 && cc < S && !occ.has(cell);
-      });
-      if (ok) placedShips.push({ name: def.name, size: def.size, cells });
-    }
-  }
-  selectedShip = null; renderFleetList(); renderPlaceGrid();
-}
-
-async function submitFleet() {
-  try {
-    await api('/api/setup', 'POST', { room: session.room, token: session.token, ships: placedShips });
-    poll();
-  } catch (e) { toast(e.message); }
-}
-
-// ---------------- battle ----------------
-function buildGrid(el, fireable) {
-  if (el.children.length) return;
-  for (let r = 0; r < S; r++) for (let c = 0; c < S; c++) {
-    const cell = document.createElement('div');
-    cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
-    if (fireable) cell.onclick = () => fire(r, c);
-    el.appendChild(cell);
-  }
-}
-
-function renderBattle(d, v) {
-  buildGrid($('fireGrid'), true);
-  buildGrid($('myGrid'), false);
-
-  // firing grid = my shots on enemy
-  document.querySelectorAll('#fireGrid .cell').forEach(cell => {
-    const val = v.firingBoard[+cell.dataset.r][+cell.dataset.c];
-    cell.className = 'cell' + (val === 'hit' ? ' hit' : val === 'miss' ? ' miss' : '');
-  });
-  // my fleet grid, with enemy shots shown
-  document.querySelectorAll('#myGrid .cell').forEach(cell => {
-    const sq = v.myBoard[+cell.dataset.r][+cell.dataset.c];
-    let cls = 'cell';
-    if (sq.shot === 'hit') cls += ' hit';
-    else if (sq.shot === 'miss') cls += ' miss';
-    else if (sq.ship) cls += ' ship';
-    cell.className = cls;
-  });
-
-  $('enemyLeft').textContent = `${v.enemyShipsLeft} ship${v.enemyShipsLeft === 1 ? '' : 's'} afloat`;
-  $('myLeft').textContent = `${v.myShipsLeft} ship${v.myShipsLeft === 1 ? '' : 's'} afloat`;
-
-  const banner = $('statusBanner');
-  if (v.phase === 'over') {
-    const won = v.winner === d.you;
-    banner.className = 'status ' + (won ? 'win' : 'lose');
-    banner.textContent = won ? 'VICTORY - enemy fleet destroyed' : 'DEFEAT - your fleet is sunk';
-  } else if (v.turn === d.you) {
-    banner.className = 'status you';
-    banner.textContent = sunkNote(v, d) || 'YOUR MOVE - tap enemy waters to fire';
-  } else {
-    banner.className = 'status them';
-    banner.textContent = sunkNote(v, d) || `Standing by - ${d.opponentName || 'opponent'} is taking aim...`;
-  }
-}
-
-function sunkNote(v, d) {
-  const ls = v.lastShot;
-  if (!ls) return null;
-  if (ls.sunk) {
-    return ls.by === d.you ? `You sank their ${ls.sunk}!` : `They sank your ${ls.sunk}.`;
-  }
-  return null;
-}
-
-async function fire(r, c) {
-  if (!lastView || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
-  if (lastView.firingBoard[r][c]) { toast('Already fired there.'); return; }
-  const cell = document.querySelector(`#fireGrid .cell[data-r="${r}"][data-c="${c}"]`);
-  if (cell) { cell.classList.add('ripple'); setTimeout(() => cell.classList.remove('ripple'), 500); }
-  try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { r, c } });
-    poll();
-  } catch (e) { toast(e.message); }
-}
-
-// ---------------- boot ----------------
-document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-$('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
-
-session = loadSession();
-if (session) { show('battle'); enterRoom(); }
-else show('home');
-</script>
 </body>
 </html>
