@@ -194,6 +194,22 @@ const battleship = {
   },
 };
 
+battleship.meta = {
+  id: 'battleship',
+  name: 'Battleship',
+  description: 'Classic hidden-fleet naval combat with one shot per turn.',
+  supportsComputer: true,
+  ui: 'battleship',
+};
+
+if (typeof module !== 'undefined' && module.exports) module.exports = battleship;
+if (typeof window !== 'undefined') {
+  if (window.CouchArmadaRegistry) {
+    window.CouchArmadaRegistry.registerGame({ ...battleship.meta, module: battleship });
+  } else {
+    window.CouchArmadaGames = window.CouchArmadaGames || {};
+    window.CouchArmadaGames.battleship = battleship;
+  }
 if (typeof module !== 'undefined' && module.exports) module.exports = battleship;
 if (typeof window !== 'undefined') {
   window.CouchArmadaGames = window.CouchArmadaGames || {};

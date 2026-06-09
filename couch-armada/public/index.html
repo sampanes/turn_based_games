@@ -65,11 +65,11 @@
   h2 { font-size: 15px; letter-spacing: 1px; text-transform: uppercase; color: var(--sonar); margin: 0 0 12px; }
   p.lede { color: var(--mute); font-size: 13px; line-height: 1.6; margin: 0 0 14px; }
   label { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mute); margin: 12px 0 6px; }
-  input {
+  input, select {
     width: 100%; background: var(--abyss); border: 1px solid var(--line); color: var(--ink);
     font-family: inherit; font-size: 16px; padding: 12px 14px; border-radius: 9px; letter-spacing: 1px;
   }
-  input:focus { outline: none; border-color: var(--sonar-dim); box-shadow: 0 0 0 3px rgba(52,231,196,.12); }
+  input:focus, select:focus { outline: none; border-color: var(--sonar-dim); box-shadow: 0 0 0 3px rgba(52,231,196,.12); }
   input.code { text-transform: uppercase; font-size: 22px; letter-spacing: 6px; text-align: center; }
   button {
     font-family: inherit; cursor: pointer; border-radius: 9px; font-size: 14px; letter-spacing: 1px;
@@ -161,6 +161,8 @@
   <!-- HOME -->
   <section id="home" class="card hidden">
     <h2>New engagement</h2>
+    <label for="gameSelect">Game</label>
+    <select id="gameSelect"></select>
     <label for="name1">Your call sign</label>
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
     <button class="primary mt" style="width:100%" onclick="createGame()">Start an online game</button>
@@ -217,6 +219,11 @@
   <div class="footnote" id="foot"></div>
 </div>
 <div class="toast" id="toast"></div>
+
+<script src="games/registry.js"></script>
+<script src="games/battleship.js"></script>
+<script src="solo.js"></script>
+<script src="app.js"></script>
 
 <script src="games/battleship.js"></script>
 <script>

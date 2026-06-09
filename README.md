@@ -5,6 +5,11 @@ uses no ads, accounts, analytics, or third-party game service. The first bundled
 game is Battleship. The mobile-first browser client also has a static "play the
 computer" mode that can run on GitHub Pages.
 
+Live GitHub Pages build: https://sampanes.github.io/turn-based-games/
+
+The repository root includes a tiny redirect page so that GitHub Pages URL opens
+the static client in `couch-armada/public/`.
+
 Game state is stored in `data.json`, which is created on first run. That file can
 include room codes, player display names, game tokens, and in-progress boards, so
 it is intentionally ignored by Git.
@@ -49,14 +54,18 @@ npm test
 ## Project Layout
 
 ```text
+index.html               GitHub Pages redirect to the static client
 couch-armada/
   server.js              shared HTTP server, API, rooms, persistence
   games/
     index.js             server game registry
     battleship.js        server wrapper around the shared Battleship rules
   public/
-    index.html           browser UI with online and computer modes
+    index.html           mobile-first shell for online and computer modes
+    app.js               shared browser controller for sessions, polling, and UI state
+    solo.js              GitHub Pages/localStorage API adapter for computer play
     games/
+      registry.js        browser game catalog for static pages
       battleship.js      shared Battleship rules used by browser and server
     manifest.json        mobile web app metadata
   test/
@@ -133,9 +142,9 @@ screen" action. HTTPS is recommended for the best install behavior.
 ## Static GitHub Pages / Computer Opponent Mode
 
 The app can be hosted as static files for solo play. Publish the contents of
-`couch-armada/public/` to GitHub Pages and keep the `games/` directory beside
-`index.html`. The "Play the computer" button stores the whole room in browser
-`localStorage`, so it works without a server.
+`couch-armada/public/` to GitHub Pages and keep `app.js`, `solo.js`, and the
+`games/` directory beside `index.html`. The "Play the computer" button stores the
+whole room in browser `localStorage`, so it works without a server.
 
 Solo mode deliberately calls the same game hooks as the HTTP server:
 
@@ -161,11 +170,12 @@ and Node-compatible format:
 - `viewFor(state, player)`
 
 The `public/games/battleship.js` module is the reference implementation. Add
-another game by creating a module in `public/games/`, registering it for the
-server in `games/index.js`, adding a `<script>` tag for static play, and adding
-the matching mobile-first UI in `public/index.html`. Expose
+another game by creating a module in `public/games/`, giving it metadata, and
+registering it through `public/games/registry.js` for static play. Register the
+same module for the server in `games/index.js`, add a `<script>` tag in
+`public/index.html`, and add or map the matching mobile-first UI. Expose
 `computerSetup()` and `computerMove()` when the game supports GitHub Pages solo
-play so the local adapter can remain generic while each game owns its own basic
+play so `public/solo.js` can remain generic while each game owns its own basic
 opponent behavior.
 
 ## Notes
