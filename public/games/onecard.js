@@ -8,6 +8,9 @@ function oneOther(players, current, direction) {
   const index = Math.max(0, players.indexOf(current));
   return players[(index + direction + players.length) % players.length];
 }
+function syncTurn(state) {
+  state.turn = currentTurn(state);
+}
 function oneCardName(card) {
   if (!card) return '';
   if (card.kind === 'wild4') return '+4 Wild';
@@ -79,15 +82,16 @@ function isPlayable(card, state) {
 function legalCards(state, who) { return (state.hands[who] || []).filter(card => isPlayable(card, state)); }
 function advanceTurn(state, steps = 1) {
   const players = activePlayers(state);
-  if (!players.length) return;
+  if (!players.length) { state.turn = null; return; }
   const current = currentTurn(state) || players[0];
   let index = players.indexOf(current);
   for (let i = 0; i < steps; i++) index = (index + state.direction + players.length) % players.length;
   state.turnIndex = index;
+  syncTurn(state);
 }
 function beginBattle(state, players) {
   const active = players.map(p => p.slot).filter(Boolean);
-  if (active.length < ONECARD_MIN_PLAYERS) return 'One-Card needs at least two players.';
+  if (active.length < ONECARD_MIN_PLAYERS) return 'UNO needs at least two players.';
   state.players = active.slice(0, ONECARD_MAX_PLAYERS);
   state.hands = {};
   state.drawPile = makeDeck();
@@ -102,7 +106,8 @@ function beginBattle(state, players) {
   state.phase = 'battle';
   state.turnIndex = 0;
   state.direction = 1;
-  state.lastAction = { text: 'Game started.' };
+  syncTurn(state);
+  state.lastAction = { text: 'Game started. First player: A.' };
   return null;
 }
 function mostCommonColor(hand) {
@@ -115,12 +120,20 @@ function firstLegalMove(state, who) {
   if (!card) return { action: 'draw' };
   return { action: 'play', cardId: card.id, color: card.color === 'wild' ? mostCommonColor(state.hands[who]) : card.color };
 }
+function cardSortKey(card) {
+  const colorOrder = { red: 0, gold: 1, green: 2, blue: 3, wild: 4 };
+  const kindOrder = { number: 0, skip: 10, reverse: 11, draw2: 12, wild: 13, wild4: 14 };
+  return [colorOrder[card.color] ?? 99, kindOrder[card.kind] ?? 99, Number(card.rank || 0), card.id].join(':');
+}
+function sortHand(hand) {
+  return hand.slice().sort((a, b) => cardSortKey(a).localeCompare(cardSortKey(b), undefined, { numeric: true }));
+}
 
 const onecard = {
   meta: {
     id: 'onecard',
-    name: 'One-Card',
-    description: 'Color-and-number shedding chaos inspired by UNO, built for 2-4 players.',
+    name: 'UNO',
+    description: 'Classic color-and-number shedding chaos for 2-4 players.',
     supportsComputer: true,
     ui: 'onecard',
     minPlayers: ONECARD_MIN_PLAYERS,
@@ -150,6 +163,7 @@ const onecard = {
       direction: 1,
       currentColor: null,
       currentValue: null,
+      turn: null,
       winner: null,
       lastAction: null,
     };
@@ -162,7 +176,7 @@ const onecard = {
     const action = move && move.action;
     if (state.phase === 'lobby') {
       if (action !== 'start') return 'Waiting for the host to start the hand.';
-      if (who !== 'A') return 'Only the host can start One-Card.';
+      if (who !== 'A') return 'Only the host can start UNO.';
       return beginBattle(state, players.length ? players : state.players.map(slot => ({ slot })));
     }
     if (state.phase !== 'battle') return 'Game is already over.';
@@ -170,7 +184,7 @@ const onecard = {
 
     if (action === 'draw') {
       const drawn = drawMany(state, who, 1);
-      state.lastAction = { by: who, text: `${who} drew a card.`, drawn: drawn.length };
+      state.lastAction = { by: who, text: `${who} drew ${drawn.length === 1 ? 'a card' : `${drawn.length} cards`} and passed.`, drawn: drawn.length };
       advanceTurn(state);
       return null;
     }
@@ -191,6 +205,7 @@ const onecard = {
     if (hand.length === 0) {
       state.phase = 'over';
       state.winner = who;
+      state.turn = null;
       return null;
     }
 
@@ -204,6 +219,7 @@ const onecard = {
       const target = oneOther(activePlayers(state), who, state.direction);
       drawMany(state, target, card.kind === 'draw2' ? 2 : 4);
       state.lastAction.drawTarget = target;
+      state.lastAction.text += ` ${target} drew ${card.kind === 'draw2' ? 2 : 4}.`;
       steps = 2;
     }
     advanceTurn(state, steps);
@@ -211,12 +227,13 @@ const onecard = {
   },
 
   viewFor(state, who, players = []) {
-    const hand = (state.hands[who] || []).slice();
+    syncTurn(state);
+    const hand = sortHand(state.hands[who] || []);
     const visiblePlayers = (players.length ? players : state.players.map(slot => ({ slot, name: slot }))).filter(p => state.players.includes(p.slot));
     return {
       ui: 'onecard',
       phase: state.phase,
-      turn: currentTurn(state),
+      turn: state.turn,
       winner: state.winner,
       canStart: state.phase === 'lobby' && who === 'A' && state.players.length >= ONECARD_MIN_PLAYERS,
       players: visiblePlayers.map(p => ({

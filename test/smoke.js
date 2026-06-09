@@ -56,6 +56,40 @@ function waitForServer(child) {
   });
 }
 
+
+function testUnoTurnSyncAndSorting() {
+  const uno = require('../public/games/onecard');
+  const state = uno.init();
+  ['A', 'B', 'C', 'D'].forEach(slot => uno.onPlayerJoined(state, slot));
+  const startErr = uno.applyMove(state, 'A', { action: 'start' }, [
+    { slot: 'A', name: 'Human' },
+    { slot: 'B', name: 'Bot Blue' },
+    { slot: 'C', name: 'Bot Green' },
+    { slot: 'D', name: 'Bot Gold' },
+  ]);
+  assert.strictEqual(startErr, null);
+  assert.strictEqual(state.turn, 'A');
+
+  state.hands.A = [
+    { id: 'z-wild', color: 'wild', kind: 'wild' },
+    { id: 'a-blue', color: 'blue', kind: 'number', rank: '4' },
+    { id: 'm-red', color: 'red', kind: 'number', rank: '1' },
+  ];
+  state.discardPile = [{ id: 'top', color: 'red', kind: 'number', rank: '7' }];
+  state.currentColor = 'red';
+  state.currentValue = '7';
+  state.turnIndex = 0;
+  state.turn = 'A';
+
+  const view = uno.viewFor(state, 'A', [{ slot: 'A', name: 'Human' }, { slot: 'B', name: 'Bot Blue' }]);
+  assert.deepStrictEqual(view.hand.map(card => card.id), ['m-red', 'a-blue', 'z-wild']);
+  assert.deepStrictEqual(view.legalCardIds.sort(), ['m-red', 'z-wild']);
+
+  const playErr = uno.applyMove(state, 'A', { action: 'play', cardId: 'm-red' });
+  assert.strictEqual(playErr, null);
+  assert.strictEqual(state.turn, 'B');
+}
+
 function fleet() {
   return [
     { name: 'Carrier', cells: ['0,0', '0,1', '0,2', '0,3', '0,4'] },
@@ -67,6 +101,7 @@ function fleet() {
 }
 
 async function main() {
+  testUnoTurnSyncAndSorting();
   try { fs.unlinkSync(dataFile); } catch {}
 
   const child = spawn(process.execPath, ['server.js'], {

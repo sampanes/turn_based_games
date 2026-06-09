@@ -38,7 +38,7 @@ Turn-Based Games running at http://0.0.0.0:8080
 LAN clients can open http://<server-ip>:8080
 ```
 
-To test on a local network, find the host IP address and open `http://<server-ip>:8080` from another device on the same network. One player starts a game and shares the 4-character room code; other players join with that code. Most games are two-player, while One-Card supports up to four players before the host starts the hand.
+To test on a local network, find the host IP address and open `http://<server-ip>:8080` from another device on the same network. One player starts a game and shares the 4-character room code; other players join with that code. Most games are two-player, while UNO supports up to four players before the host starts the hand.
 
 The port can be changed with:
 
@@ -48,7 +48,7 @@ PORT=3000 node server.js
 
 ## Test
 
-The smoke test starts the server on a temporary local port and exercises the main Battleship API flow, Connect Four room creation and move handling, and the multiplayer One-Card lobby/start flow.
+The smoke test starts the server on a temporary local port and exercises the main Battleship API flow, Connect Four room creation and move handling, and the multiplayer UNO lobby/start flow.
 
 ```bash
 npm test
@@ -69,7 +69,7 @@ public/
     registry.js        browser game catalog for static pages
     battleship.js      shared Battleship rules used by browser and server
     connectfour.js     shared Connect Four rules and basic computer opponent
-    onecard.js         shared One-Card rules for 2-4 players and solo bots
+    onecard.js         shared UNO rules for 2-4 players and solo bots
   manifest.json        mobile web app metadata
 server/
   games/               Node wrappers that expose the shared browser rules to server.js
@@ -136,6 +136,6 @@ The `public/games/battleship.js` module is the reference implementation. Add ano
 
 - Battleship uses one shot per turn with strict alternation.
 - Connect Four uses standard 7-column, 6-row gravity drops and detects horizontal, vertical, and diagonal fours.
-- One-Card is an UNO-like shedding game for 2-4 server players; static solo play seats the human against three first-legal-card computer players.
+- UNO is a shedding game for 2-4 server players; static solo play seats the human against three first-legal-card computer players.
 - To reset local multiplayer state, stop the server, delete `data.json`, and start it again.
 - To reset static solo state, clear the browser's local storage for the site.
