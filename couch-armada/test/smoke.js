@@ -122,6 +122,26 @@ async function main() {
     });
     assert.strictEqual(move.status, 200);
 
+    const connectCreated = await request(port, 'POST', '/api/create', { game: 'connectfour', name: 'Red' });
+    assert.strictEqual(connectCreated.status, 200);
+    assert.strictEqual(connectCreated.data.game, 'connectfour');
+
+    const connectJoined = await request(port, 'POST', '/api/join', { room: connectCreated.data.room, name: 'Gold' });
+    assert.strictEqual(connectJoined.status, 200);
+
+    const connectState = await request(port, 'GET', `/api/state?room=${connectCreated.data.room}&token=${connectCreated.data.token}`, null);
+    assert.strictEqual(connectState.status, 200);
+    assert.strictEqual(connectState.data.view.ui, 'connectfour');
+    assert.strictEqual(connectState.data.view.phase, 'battle');
+    assert.deepStrictEqual(connectState.data.view.legalMoves, [0, 1, 2, 3, 4, 5, 6]);
+
+    const connectMove = await request(port, 'POST', '/api/move', {
+      room: connectCreated.data.room,
+      token: connectCreated.data.token,
+      move: { c: 3 },
+    });
+    assert.strictEqual(connectMove.status, 200);
+
     const badJoin = await request(port, 'POST', '/api/join', { room: created.data.room, name: 'Extra' });
     assert.strictEqual(badJoin.status, 409);
   } finally {
