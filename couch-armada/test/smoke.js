@@ -150,6 +150,42 @@ async function main() {
     });
     assert.strictEqual(connectMove.status, 200);
 
+
+    const oneCreated = await request(port, 'POST', '/api/create', { game: 'onecard', name: 'Host' });
+    assert.strictEqual(oneCreated.status, 200);
+    assert.strictEqual(oneCreated.data.game, 'onecard');
+
+    const oneJoinB = await request(port, 'POST', '/api/join', { room: oneCreated.data.room, name: 'Blue' });
+    assert.strictEqual(oneJoinB.status, 200);
+    assert.strictEqual(oneJoinB.data.you, 'B');
+
+    const oneJoinC = await request(port, 'POST', '/api/join', { room: oneCreated.data.room, name: 'Green' });
+    assert.strictEqual(oneJoinC.status, 200);
+    assert.strictEqual(oneJoinC.data.you, 'C');
+
+    const oneLobby = await request(port, 'GET', `/api/state?room=${oneCreated.data.room}&token=${oneCreated.data.token}`, null);
+    assert.strictEqual(oneLobby.status, 200);
+    assert.strictEqual(oneLobby.data.view.ui, 'onecard');
+    assert.strictEqual(oneLobby.data.view.phase, 'lobby');
+    assert.strictEqual(oneLobby.data.view.canStart, true);
+    assert.strictEqual(oneLobby.data.players.length, 3);
+
+    const oneStart = await request(port, 'POST', '/api/move', {
+      room: oneCreated.data.room,
+      token: oneCreated.data.token,
+      move: { action: 'start' },
+    });
+    assert.strictEqual(oneStart.status, 200);
+
+    const oneState = await request(port, 'GET', `/api/state?room=${oneCreated.data.room}&token=${oneCreated.data.token}`, null);
+    assert.strictEqual(oneState.status, 200);
+    assert.strictEqual(oneState.data.view.phase, 'battle');
+    assert.strictEqual(oneState.data.view.hand.length, 7);
+    assert.strictEqual(oneState.data.view.players.length, 3);
+
+    const oneJoinDeny = await request(port, 'POST', '/api/join', { room: oneCreated.data.room, name: 'Late' });
+    assert.strictEqual(oneJoinDeny.status, 409);
+
     const badJoin = await request(port, 'POST', '/api/join', { room: created.data.room, name: 'Extra' });
     assert.strictEqual(badJoin.status, 409);
   } finally {

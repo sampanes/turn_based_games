@@ -31,9 +31,9 @@ LAN clients can open http://<server-ip>:8080
 ```
 
 To test on a local network, find the host IP address and open
-`http://<server-ip>:8080` from another device on the same network. One player
-starts a game and shares the 4-character room code; the second player joins with
-that code.
+`http://<server-ip>:8080` from another device on the same network. One player starts a game and shares the 4-character room code; other players
+join with that code. Most games are two-player, while One-Card supports up to
+four players before the host starts the hand.
 
 The port can be changed with:
 
@@ -44,7 +44,7 @@ PORT=3000 node server.js
 ## Test
 
 The smoke test starts the server on a temporary local port and exercises the main
-Battleship API flow plus Connect Four room creation and move handling.
+Battleship API flow, Connect Four room creation and move handling, and the multiplayer One-Card lobby/start flow.
 
 ```bash
 cd couch-armada
@@ -61,6 +61,7 @@ couch-armada/
     index.js             server game registry
     battleship.js        server wrapper around the shared Battleship rules
     connectfour.js       server wrapper around the shared Connect Four rules
+    onecard.js           server wrapper around the shared One-Card rules
   public/
     index.html           mobile-first shell for online and computer modes
     app.js               shared browser controller for sessions, polling, and UI state
@@ -69,6 +70,7 @@ couch-armada/
       registry.js        browser game catalog for static pages
       battleship.js      shared Battleship rules used by browser and server
       connectfour.js     shared Connect Four rules and basic computer opponent
+      onecard.js         shared One-Card rules for 2-4 players and solo bots
     manifest.json        mobile web app metadata
   test/
     smoke.js             zero-dependency HTTP smoke test
@@ -154,7 +156,7 @@ Solo mode deliberately calls the same game hooks as the HTTP server:
 - `validateSetup()` validates and commits both fleets.
 - `applyMove()` applies both human and computer turns.
 - `viewFor()` renders the player-specific board.
-- Optional `computerSetup()` and `computerMove()` hooks let static solo mode set up and take a basic opponent turn without duplicating rule logic.
+- Optional `computerSetup()`, `computerPlayers()`, and `computerMove()` hooks let static solo mode seat one or more bots, set them up, and take basic opponent turns without duplicating rule logic.
 
 That keeps turn order, hidden information, win conditions, and move validation
 aligned with the future online server mode instead of copying game rules into the
@@ -184,5 +186,6 @@ opponent behavior.
 
 - Battleship uses one shot per turn with strict alternation.
 - Connect Four uses standard 7-column, 6-row gravity drops and detects horizontal, vertical, and diagonal fours.
+- One-Card is an UNO-like shedding game for 2-4 server players; static solo play seats the human against three first-legal-card computer players.
 - To reset local state, stop the server, delete `data.json`, and start it again.
-- Rooms are two-player only; a full room rejects additional joins.
+- Battleship and Connect Four rooms are two-player only. One-Card rooms accept up to four players while still in the lobby, and a full or already-started room rejects additional joins.

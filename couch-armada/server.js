@@ -53,9 +53,23 @@ function roomCode() {
 
 // ----------------------------------------------------------------- room helpers
 function playerOf(room, tok) {
-  if (room.players.A && room.players.A.token === tok) return 'A';
-  if (room.players.B && room.players.B.token === tok) return 'B';
+  for (const [slot, player] of Object.entries(room.players || {})) {
+    if (player && player.token === tok) return slot;
+  }
   return null;
+}
+
+const PLAYER_SLOTS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+function gameMeta(type) { return (games[type] && games[type].meta) || {}; }
+function maxPlayers(type) { return gameMeta(type).maxPlayers || 2; }
+function minPlayers(type) { return gameMeta(type).minPlayers || 2; }
+function roomPlayers(room) { return Object.keys(room.players).filter(slot => room.players[slot]); }
+function nextSlot(room) { return PLAYER_SLOTS.find(slot => !room.players[slot]); }
+function publicPlayers(room) {
+  return roomPlayers(room).map(slot => ({ slot, name: room.players[slot].name }));
+}
+function notifyJoin(room, slot) {
+  if (typeof games[room.game].onPlayerJoined === 'function') games[room.game].onPlayerJoined(room.state, slot);
 }
 
 function cleanName(value, fallback) {
@@ -81,9 +95,11 @@ function handleApi(req, res, body) {
     const tok = token();
     db.rooms[code] = {
       code, game: type, createdAt: Date.now(),
-      players: { A: { token: tok, name: cleanName(body.name, 'Player 1') }, B: null },
+      players: Object.fromEntries(PLAYER_SLOTS.slice(0, maxPlayers(type)).map(slot => [slot, null])),
       state: games[type].init(),
     };
+    db.rooms[code].players.A = { token: tok, name: cleanName(body.name, 'Player 1') };
+    notifyJoin(db.rooms[code], 'A');
     save();
     return send(res, 200, { room: code, token: tok, you: 'A', game: type });
   }
@@ -91,11 +107,15 @@ function handleApi(req, res, body) {
   if (route === '/api/join' && req.method === 'POST') {
     const room = db.rooms[(body.room || '').toUpperCase()];
     if (!room) return send(res, 404, { error: 'No game with that code.' });
-    if (room.players.B) return send(res, 409, { error: 'That game is already full.' });
+    const joined = roomPlayers(room);
+    if (joined.length >= maxPlayers(room.game)) return send(res, 409, { error: 'That game is already full.' });
+    if (joined.length >= minPlayers(room.game) && room.state && room.state.phase !== 'lobby') return send(res, 409, { error: 'That game already started.' });
+    const slot = nextSlot(room);
     const tok = token();
-    room.players.B = { token: tok, name: cleanName(body.name, 'Player 2') };
+    room.players[slot] = { token: tok, name: cleanName(body.name, `Player ${joined.length + 1}`) };
+    notifyJoin(room, slot);
     save();
-    return send(res, 200, { room: room.code, token: tok, you: 'B', game: room.game });
+    return send(res, 200, { room: room.code, token: tok, you: slot, game: room.game });
   }
 
   if (route === '/api/setup' && req.method === 'POST') {
@@ -114,7 +134,7 @@ function handleApi(req, res, body) {
     if (!room) return send(res, 404, { error: 'No such game.' });
     const who = playerOf(room, body.token);
     if (!who) return send(res, 403, { error: 'Not in this game.' });
-    const err = games[room.game].applyMove(room.state, who, body.move);
+    const err = games[room.game].applyMove(room.state, who, body.move, publicPlayers(room));
     if (err) return send(res, 400, { error: err });
     save();
     return send(res, 200, { ok: true });
@@ -125,14 +145,17 @@ function handleApi(req, res, body) {
     if (!room) return send(res, 404, { error: 'No such game.' });
     const who = playerOf(room, url.searchParams.get('token'));
     if (!who) return send(res, 403, { error: 'Not in this game.' });
-    const opp = who === 'A' ? room.players.B : room.players.A;
+    const opp = roomPlayers(room).filter(slot => slot !== who).map(slot => room.players[slot]);
     return send(res, 200, {
       game: room.game,
       you: who,
       youName: room.players[who].name,
-      opponentJoined: !!opp,
-      opponentName: opp ? opp.name : null,
-      view: games[room.game].viewFor(room.state, who),
+      opponentJoined: roomPlayers(room).length >= minPlayers(room.game),
+      opponentName: opp.length === 1 ? opp[0].name : (opp.length ? `${opp.length} rivals` : null),
+      players: publicPlayers(room),
+      minPlayers: minPlayers(room.game),
+      maxPlayers: maxPlayers(room.game),
+      view: games[room.game].viewFor(room.state, who, publicPlayers(room)),
     });
   }
 

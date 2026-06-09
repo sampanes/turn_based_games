@@ -8,20 +8,26 @@
     if (session && session.mode === 'computer') root.localStorage.removeItem(soloKey(session.room));
   }
 
+  function publicPlayers(room) {
+    return room.players.map(player => ({ slot: player.slot, name: player.name }));
+  }
+
   function computerSetup(game) {
     if (typeof game.computerSetup !== 'function') throw new Error('This game does not have a computer setup yet.');
     return game.computerSetup();
   }
 
-  function computerMove(room) {
+  function computerMove(room, slot) {
     if (typeof room.game.computerMove !== 'function') throw new Error('This game does not have a computer opponent yet.');
-    return room.game.computerMove(room.state, 'B');
+    return room.game.computerMove(room.state, slot);
   }
 
   function advanceComputer(room) {
-    if (room.state.phase === 'battle' && room.state.turn === 'B') {
-      const move = computerMove(room);
-      if (move) room.game.applyMove(room.state, 'B', move);
+    let guard = 0;
+    while (room.state.phase === 'battle' && room.state.turn && room.state.turn !== 'A' && guard++ < 40) {
+      const move = computerMove(room, room.state.turn);
+      if (!move) break;
+      room.game.applyMove(room.state, room.state.turn, move, publicPlayers(room));
     }
   }
 
@@ -34,15 +40,18 @@
 
     const code = soloRoomCode();
     const tok = soloToken();
+    const computers = typeof game.computerPlayers === 'function'
+      ? game.computerPlayers()
+      : [{ slot: 'B', name: 'Computer' }];
     const room = {
       code,
       gameName,
       game,
       humanToken: tok,
-      humanName: body.name || 'Player 1',
-      computerName: 'Computer',
+      players: [{ slot: 'A', name: body.name || 'Player 1', human: true }, ...computers],
       state: game.init(),
     };
+    if (typeof game.onPlayerJoined === 'function') room.players.forEach(player => game.onPlayerJoined(room.state, player.slot));
     storeRoom(room);
     return { room: code, token: tok, you: 'A', game: gameName, mode: 'computer' };
   }
@@ -53,6 +62,10 @@
     const meta = helpers.gameMeta(room.gameName);
     room.game = meta && meta.module;
     if (!room.game) throw new Error('That game is not available for solo play yet.');
+    if (!room.players) room.players = [
+      { slot: 'A', name: room.humanName || 'Player 1', human: true },
+      { slot: 'B', name: room.computerName || 'Computer' },
+    ];
     return room;
   }
 
@@ -67,15 +80,17 @@
     if (route.endsWith('/api/setup') && method === 'POST') {
       const err = room.game.validateSetup(room.state, 'A', body.ships);
       if (err) throw new Error(err);
-      const cpuErr = room.game.validateSetup(room.state, 'B', computerSetup(room.game));
-      if (cpuErr) throw new Error(cpuErr);
+      for (const player of room.players.filter(p => !p.human)) {
+        const cpuErr = room.game.validateSetup(room.state, player.slot, computerSetup(room.game));
+        if (cpuErr) throw new Error(cpuErr);
+      }
       advanceComputer(room);
       storeRoom(room);
       return { ok: true };
     }
 
     if (route.endsWith('/api/move') && method === 'POST') {
-      const err = room.game.applyMove(room.state, 'A', body.move);
+      const err = room.game.applyMove(room.state, 'A', body.move, publicPlayers(room));
       if (err) throw new Error(err);
       advanceComputer(room);
       storeRoom(room);
@@ -85,13 +100,17 @@
     if (route.endsWith('/api/state') && method === 'GET') {
       advanceComputer(room);
       storeRoom(room);
+      const opponents = room.players.filter(player => player.slot !== 'A');
       return {
         game: room.gameName,
         you: 'A',
-        youName: room.humanName,
+        youName: room.players.find(player => player.slot === 'A').name,
         opponentJoined: true,
-        opponentName: room.computerName,
-        view: room.game.viewFor(room.state, 'A'),
+        opponentName: opponents.length === 1 ? opponents[0].name : `${opponents.length} rivals`,
+        players: publicPlayers(room),
+        minPlayers: (room.game.meta && room.game.meta.minPlayers) || 2,
+        maxPlayers: (room.game.meta && room.game.meta.maxPlayers) || 2,
+        view: room.game.viewFor(room.state, 'A', publicPlayers(room)),
       };
     }
 
