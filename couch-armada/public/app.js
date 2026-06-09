@@ -19,6 +19,7 @@ function clearSession() {
 
 function show(id) {
   ['home','lobby','placement','battle','connectFour'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+  ['home','lobby','placement','battle'].forEach(s => $(s).classList.toggle('hidden', s !== id));
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -95,6 +96,7 @@ async function joinGame() {
 function leaveGame() {
   if (!confirm('Leave this game? This clears the saved local session for this device.')) return;
   clearSession(); stopPoll(); resetGameUi(); show('home');
+  clearSession(); stopPoll(); resetPlacement(); show('home');
 }
 
 function enterRoom() { startPoll(); poll(); }

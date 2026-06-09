@@ -3,11 +3,13 @@
 Couch Armada is a small self-hosted server for two-player turn-based games. It
 uses no ads, accounts, analytics, or third-party game service. The first bundled
 games are Battleship and Connect Four. The mobile-first browser client also has a static "play the
+game is Battleship. The mobile-first browser client also has a static "play the
 computer" mode that can run on GitHub Pages.
 
 Live GitHub Pages build: https://sampanes.github.io/turn-based-games/
 
 The repository root includes a mobile-friendly welcome page with a launch link to
+The repository root includes a tiny redirect page so that GitHub Pages URL opens
 the static client in `couch-armada/public/`.
 
 Game state is stored in `data.json`, which is created on first run. That file can
@@ -55,6 +57,7 @@ npm test
 
 ```text
 index.html               GitHub Pages welcome page linking to the static client
+index.html               GitHub Pages redirect to the static client
 couch-armada/
   server.js              shared HTTP server, API, rooms, persistence
   games/
