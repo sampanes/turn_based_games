@@ -148,6 +148,34 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .footnote { text-align: center; color: var(--mute); font-size: 11px; margin-top: 22px; letter-spacing: 1px; }
   .link { color: var(--sonar-dim); cursor: pointer; text-decoration: underline; }
+
+  /* connect four */
+  .connect-panel {
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(circle at 18% 0%, rgba(52,231,196,.18), transparent 28%),
+      linear-gradient(180deg, rgba(17,49,63,.86), rgba(5,16,24,.9));
+  }
+  .connect-panel::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .22;
+    background: radial-gradient(circle at 50% 18%, transparent 0 18%, rgba(52,231,196,.16) 19%, transparent 20%) 0 0/42px 42px;
+  }
+  .connect-panel > * { position: relative; z-index: 1; }
+  .connect-stage { margin-top: 14px; padding: 12px; border: 1px solid rgba(52,231,196,.22); border-radius: 18px; background: linear-gradient(180deg, #082838, #041018); box-shadow: inset 0 0 30px rgba(52,231,196,.08), 0 18px 40px rgba(0,0,0,.35); }
+  .connect-columns { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin-bottom: 8px; }
+  .drop-btn { min-height: 40px; padding: 8px 0; border-radius: 999px; background: rgba(52,231,196,.08); color: var(--sonar); border-color: rgba(52,231,196,.28); font-size: 18px; line-height: 1; }
+  .drop-btn:disabled { opacity: .28; cursor: not-allowed; }
+  .connect-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; padding: 10px; border-radius: 16px; background: linear-gradient(160deg, #0d4b67, #072233); border: 1px solid rgba(52,231,196,.28); box-shadow: inset 0 0 22px rgba(0,0,0,.55); }
+  .connect-cell { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #12394a, #061923 72%); box-shadow: inset 0 6px 12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
+  .connect-cell.A { background: radial-gradient(circle at 34% 25%, #fff4b8 0 12%, #ffcf52 30%, #c97916 78%); box-shadow: 0 0 16px rgba(255,179,71,.42), inset 0 -8px 14px rgba(85,40,0,.35); }
+  .connect-cell.B { background: radial-gradient(circle at 34% 25%, #d9fff8 0 12%, #34e7c4 30%, #107160 78%); box-shadow: 0 0 16px rgba(52,231,196,.42), inset 0 -8px 14px rgba(0,55,45,.35); }
+  .connect-cell.last { outline: 2px solid #fff; outline-offset: -4px; }
+  .connect-cell.win { animation: connectWin 1s ease-in-out infinite alternate; }
+  @keyframes connectWin { from { transform: scale(1); filter: brightness(1); } to { transform: scale(1.08); filter: brightness(1.35); } }
+  .connect-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--mute); font-size: 12px; }
+  .disc-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .disc-dot.A { background: #ffcf52; box-shadow: 0 0 10px rgba(255,179,71,.6); }
+  .disc-dot.B { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.6); }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -216,12 +244,30 @@
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
+
+  <!-- CONNECT FOUR -->
+  <section id="connectFour" class="card connect-panel hidden">
+    <div id="connectStatus" class="status">...</div>
+    <div class="connect-stage">
+      <div class="connect-columns" id="connectColumns"></div>
+      <div class="connect-board" id="connectBoard"></div>
+    </div>
+    <div class="connect-legend">
+      <span><span class="disc-dot A"></span>You</span>
+      <span><span class="disc-dot B"></span>Opponent</span>
+    </div>
+    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+  </section>
+
   <div class="footnote" id="foot"></div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script src="games/registry.js"></script>
 <script src="games/battleship.js"></script>
+<script src="games/connectfour.js"></script>
+<script src="solo.js"></script>
+<script src="app.js"></script>
 <script src="solo.js"></script>
 <script src="app.js"></script>
 
@@ -582,9 +628,5 @@ async function fire(r, c) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 
-session = loadSession();
-if (session) { show('battle'); enterRoom(); }
-else show('home');
-</script>
 </body>
 </html>

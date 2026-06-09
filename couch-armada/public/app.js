@@ -18,6 +18,7 @@ function clearSession() {
 }
 
 function show(id) {
+  ['home','lobby','placement','battle','connectFour'].forEach(s => $(s).classList.toggle('hidden', s !== id));
   ['home','lobby','placement','battle'].forEach(s => $(s).classList.toggle('hidden', s !== id));
 }
 function toast(msg) {
@@ -37,6 +38,7 @@ function gameMeta(id) {
 function availableGames() {
   return Object.fromEntries(gameCatalog().map(game => [game.id, game.module]));
 }
+function currentGameMeta() { return gameMeta(session && session.game) || gameMeta(selectedGameId()); }
 function selectedGameId() { return $('gameSelect').value || 'battleship'; }
 function populateGameSelect() {
   const select = $('gameSelect');
@@ -93,6 +95,7 @@ async function joinGame() {
 }
 function leaveGame() {
   if (!confirm('Leave this game? This clears the saved local session for this device.')) return;
+  clearSession(); stopPoll(); resetGameUi(); show('home');
   clearSession(); stopPoll(); resetPlacement(); show('home');
 }
 
@@ -117,6 +120,13 @@ function render(d) {
 
   if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; return; }
 
+  const meta = currentGameMeta();
+  if ((v.ui || (meta && meta.ui)) === 'connectfour') {
+    show('connectFour');
+    renderConnectFour(d, v);
+    return;
+  }
+
   if (v.phase === 'placing') {
     if (v.youPlaced) {
       show('placement'); document.querySelectorAll('#placement .grid, #placement .fleet, #placement .row, #readyBtn, #placeHint').forEach(el => el.classList.add('hidden'));
@@ -131,6 +141,15 @@ function render(d) {
 
   show('battle');
   renderBattle(d, v);
+}
+
+// ---------------- shared UI reset ----------------
+function resetGameUi() {
+  resetPlacement();
+  $('fireGrid').innerHTML = '';
+  $('myGrid').innerHTML = '';
+  $('connectColumns').innerHTML = '';
+  $('connectBoard').innerHTML = '';
 }
 
 // ---------------- placement ----------------
@@ -303,6 +322,70 @@ async function fire(r, c) {
   if (cell) { cell.classList.add('ripple'); setTimeout(() => cell.classList.remove('ripple'), 500); }
   try {
     await api('/api/move', 'POST', { room: session.room, token: session.token, move: { r, c } });
+    poll();
+  } catch (e) { toast(e.message); }
+}
+
+
+// ---------------- connect four ----------------
+function connectCanMove(v, c) {
+  return v.phase === 'battle' && v.turn === session.you && v.legalMoves.includes(c);
+}
+
+function renderConnectFour(d, v) {
+  const cols = v.cols || 7;
+  const rows = v.rows || 6;
+  const columns = $('connectColumns');
+  const board = $('connectBoard');
+  const winning = new Set(v.winningCells || []);
+  const last = v.lastMove ? `${v.lastMove.r},${v.lastMove.c}` : null;
+
+  columns.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  columns.innerHTML = '';
+  for (let c = 0; c < cols; c++) {
+    const btn = document.createElement('button');
+    btn.className = 'drop-btn';
+    btn.textContent = '▼';
+    btn.disabled = !connectCanMove(v, c);
+    btn.setAttribute('aria-label', `Drop disc in column ${c + 1}`);
+    btn.onclick = () => dropConnectDisc(c);
+    columns.appendChild(btn);
+  }
+
+  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  board.innerHTML = '';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const owner = v.board[r][c];
+    const key = `${r},${c}`;
+    const cell = document.createElement('div');
+    cell.className = 'connect-cell'
+      + (owner ? ` ${owner}` : '')
+      + (last === key ? ' last' : '')
+      + (winning.has(key) ? ' win' : '');
+    cell.setAttribute('aria-label', owner ? `${owner === d.you ? 'Your' : 'Opponent'} disc` : 'Empty slot');
+    board.appendChild(cell);
+  }
+
+  const banner = $('connectStatus');
+  if (v.phase === 'over') {
+    const tied = !v.winner;
+    const won = v.winner === d.you;
+    banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    banner.textContent = tied ? 'DRAW - the grid is full' : won ? 'VICTORY - four connected' : 'DEFEAT - rival connected four';
+  } else if (v.turn === d.you) {
+    banner.className = 'status you';
+    banner.textContent = 'YOUR DROP - choose a column';
+  } else {
+    banner.className = 'status them';
+    banner.textContent = `Standing by - ${d.opponentName || 'opponent'} is lining up a drop...`;
+  }
+}
+
+async function dropConnectDisc(c) {
+  if (!lastView || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
+  if (!lastView.legalMoves.includes(c)) { toast('That column is full.'); return; }
+  try {
+    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { c } });
     poll();
   } catch (e) { toast(e.message); }
 }

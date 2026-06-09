@@ -2,6 +2,7 @@
 
 Couch Armada is a small self-hosted server for two-player turn-based games. It
 uses no ads, accounts, analytics, or third-party game service. The first bundled
+games are Battleship and Connect Four. The mobile-first browser client also has a static "play the
 game is Battleship. The mobile-first browser client also has a static "play the
 computer" mode that can run on GitHub Pages.
 
@@ -60,6 +61,7 @@ couch-armada/
   games/
     index.js             server game registry
     battleship.js        server wrapper around the shared Battleship rules
+    connectfour.js       server wrapper around the shared Connect Four rules
   public/
     index.html           mobile-first shell for online and computer modes
     app.js               shared browser controller for sessions, polling, and UI state
@@ -67,6 +69,7 @@ couch-armada/
     games/
       registry.js        browser game catalog for static pages
       battleship.js      shared Battleship rules used by browser and server
+      connectfour.js     shared Connect Four rules and basic computer opponent
     manifest.json        mobile web app metadata
   test/
     smoke.js             zero-dependency HTTP smoke test
@@ -181,5 +184,6 @@ opponent behavior.
 ## Notes
 
 - Battleship uses one shot per turn with strict alternation.
+- Connect Four uses standard 7-column, 6-row gravity drops and detects horizontal, vertical, and diagonal fours.
 - To reset local state, stop the server, delete `data.json`, and start it again.
 - Rooms are two-player only; a full room rejects additional joins.
