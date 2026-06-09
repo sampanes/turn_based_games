@@ -179,7 +179,7 @@
   .disc-dot.A { background: #ffcf52; box-shadow: 0 0 10px rgba(255,179,71,.6); }
   .disc-dot.B { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.6); }
 
-  /* one-card */
+  /* UNO */
   .one-card-panel { overflow: hidden; }
   .one-card-table { display: grid; gap: 14px; }
   .one-card-code { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed rgba(255,179,71,.45); border-radius: 12px; color: var(--amber); background: rgba(255,179,71,.06); }
@@ -187,11 +187,17 @@
   .one-opponents { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .one-opponent { min-height: 58px; padding: 9px; border: 1px solid rgba(207,233,236,.12); border-radius: 14px; background: rgba(6,20,27,.64); color: var(--mute); display: flex; flex-direction: column; justify-content: space-between; }
   .one-opponent.active { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 18px rgba(255,179,71,.12); }
+  .one-opponent.uno { border-color: var(--fire); color: #ffd6d2; background: linear-gradient(145deg, rgba(169,22,40,.34), rgba(6,20,27,.64)); }
   .one-opponent span { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .one-opponent strong { font-size: 22px; }
   .one-card-center { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: center; padding: 14px; border-radius: 22px; background: radial-gradient(circle at 50% 30%, rgba(52,231,196,.10), rgba(6,20,27,.7) 65%); border: 1px solid rgba(52,231,196,.18); }
-  .one-card-card { aspect-ratio: 5 / 7; min-height: 112px; border-radius: 18px; border: 2px solid rgba(255,255,255,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #fff; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.45); box-shadow: inset 0 0 0 5px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); }
+  .one-card-card { position: relative; aspect-ratio: 5 / 7; min-height: 112px; border-radius: 18px; border: 2px solid rgba(255,255,255,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #fff; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.45); box-shadow: inset 0 0 0 5px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); overflow: hidden; }
   .one-card-card span { font-size: clamp(25px, 11vw, 44px); line-height: 1; }
+  .one-card-card::after { content: ""; position: absolute; inset: 18% 16%; border: 2px solid rgba(255,255,255,.24); border-radius: 50%; transform: rotate(-18deg); }
+  .one-card-card > * { position: relative; z-index: 1; }
+  .one-card-card .corner { position: absolute; font-size: 11px; letter-spacing: .5px; }
+  .one-card-card .corner.top { top: 9px; left: 10px; }
+  .one-card-card .corner.bottom { right: 10px; bottom: 9px; transform: rotate(180deg); }
   .one-card-card small { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
   .one-card-card.red { background: linear-gradient(145deg, #ff695f, #a91628); }
   .one-card-card.gold { background: linear-gradient(145deg, #ffd36b, #c27a00); }
@@ -199,8 +205,9 @@
   .one-card-card.blue { background: linear-gradient(145deg, #58b7ff, #1050b7); }
   .one-card-card.wild { background: conic-gradient(from 45deg, #ff5b51, #ffcf52, #34e78a, #58b7ff, #ff5b51); }
   button.one-card-card { padding: 8px; transition: transform .12s ease, filter .12s ease; }
-  button.one-card-card.playable { transform: translateY(-8px); filter: saturate(1.2) brightness(1.08); border-color: #fff; }
+  button.one-card-card.playable { transform: translateY(-8px); filter: saturate(1.2) brightness(1.08); border-color: #fff; animation: playablePulse 1.7s ease-in-out infinite; }
   button.one-card-card:disabled { cursor: not-allowed; opacity: .52; filter: grayscale(.18); }
+  @keyframes playablePulse { 0%, 100% { box-shadow: inset 0 0 0 5px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); } 50% { box-shadow: inset 0 0 0 5px rgba(255,255,255,.22), 0 0 26px rgba(255,255,255,.28); } }
   .one-card-deck { background: linear-gradient(145deg, #142d3a, #06141b); color: var(--sonar); }
   .one-card-meta { display: grid; gap: 8px; color: var(--mute); font-size: 12px; }
   .one-card-colors { display: flex; gap: 7px; justify-content: center; }
@@ -232,7 +239,7 @@
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
     <button class="primary mt" style="width:100%" onclick="createGame()">Start live multiplayer</button>
     <button class="mt" style="width:100%" onclick="createComputerGame()">Play vs computer</button>
-    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the same rules modules as the server. One-Card solo seats you against three simple bots.</p>
+    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the same rules modules as the server. UNO solo seats you against three simple bots.</p>
     <div class="divider">- OR -</div>
     <h2 style="margin-top:6px">Join a game</h2>
     <label for="joinCode">Game code</label>
@@ -298,7 +305,7 @@
   </section>
 
 
-  <!-- ONE-CARD -->
+  <!-- UNO -->
   <section id="oneCard" class="card one-card-panel hidden">
     <div id="oneCardStatus" class="status">...</div>
     <div class="one-card-table mt">
@@ -306,7 +313,7 @@
         <span>Invite code</span>
         <strong id="oneCardCode">....</strong>
       </div>
-      <button id="oneCardStart" class="primary hidden" style="width:100%" onclick="startOneCard()">Start One-Card</button>
+      <button id="oneCardStart" class="primary hidden" style="width:100%" onclick="startOneCard()">Start UNO</button>
       <div class="one-opponents" id="oneCardOpponents"></div>
       <div class="one-card-center">
         <div class="one-card-card one-card-deck"><span>▧</span><small id="oneCardDeckCount">0 in draw pile</small></div>
@@ -318,6 +325,7 @@
           <span id="oneCardCount">0 cards</span>
           <span id="oneCardDirection" style="text-align:right">clockwise</span>
         </div>
+        <div id="oneCardCurrentColor" class="one-card-last">Current color: none</div>
         <div id="oneCardLast" class="one-card-last">First to empty their hand wins.</div>
       </div>
       <div class="one-card-toolbar">

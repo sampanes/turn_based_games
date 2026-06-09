@@ -467,7 +467,7 @@ async function dropConnectDisc(c) {
   } catch (e) { toast(e.message); }
 }
 
-// ---------------- one-card ----------------
+// ---------------- UNO ----------------
 function oneCardLabel(card) {
   if (!card) return '—';
   if (card.kind === 'wild4') return '+4';
@@ -496,8 +496,14 @@ function renderOneCard(d, v) {
   opponents.innerHTML = '';
   players.filter(player => !player.you).forEach(player => {
     const tile = document.createElement('div');
-    tile.className = 'one-opponent' + (v.turn === player.slot ? ' active' : '');
-    tile.innerHTML = `<span>${player.name}</span><strong>${player.cards}</strong>`;
+    tile.className = 'one-opponent'
+      + (v.turn === player.slot ? ' active' : '')
+      + (player.cards === 1 ? ' uno' : '');
+    const name = document.createElement('span');
+    name.textContent = player.name;
+    const count = document.createElement('strong');
+    count.textContent = player.cards === 1 ? 'UNO!' : player.cards;
+    tile.append(name, count);
     opponents.appendChild(tile);
   });
 
@@ -505,9 +511,13 @@ function renderOneCard(d, v) {
   $('oneCardCodeWrap').classList.toggle('hidden', v.phase !== 'lobby');
   $('oneCardStart').classList.toggle('hidden', v.phase !== 'lobby' || !v.canStart);
   $('oneCardDraw').disabled = !(v.phase === 'battle' && v.turn === session.you);
+  $('oneCardDraw').textContent = v.legalCardIds && v.legalCardIds.length ? 'Draw / pass (D)' : 'Draw card (D)';
   $('oneCardCount').textContent = `${me.cards || (v.hand || []).length} card${(me.cards || (v.hand || []).length) === 1 ? '' : 's'}`;
-  $('oneCardDirection').textContent = v.direction === -1 ? 'counter-clockwise' : 'clockwise';
+  $('oneCardDirection').textContent = v.direction === -1 ? '↺ counter-clockwise' : '↻ clockwise';
   $('oneCardDeckCount').textContent = `${v.drawCount || 0} in draw pile`;
+  const colorName = v.currentColor ? v.currentColor[0].toUpperCase() + v.currentColor.slice(1) : 'None';
+  const currentColorLabel = $('oneCardCurrentColor');
+  if (currentColorLabel) currentColorLabel.textContent = `Current color: ${colorName}`;
 
   const top = v.topCard;
   const discard = $('oneCardDiscard');
@@ -528,7 +538,9 @@ function renderOneCard(d, v) {
     const btn = document.createElement('button');
     btn.className = `one-card-card ${oneCardColor(card)}` + (oneCardCanPlay(v, card) ? ' playable' : '');
     btn.disabled = !oneCardCanPlay(v, card);
-    btn.innerHTML = `<span>${oneCardLabel(card)}</span><small>${card.color === 'wild' ? 'Wild' : card.color}</small>`;
+    const label = oneCardLabel(card);
+    const color = card.color === 'wild' ? 'Wild' : card.color;
+    btn.innerHTML = `<b class="corner top">${label}</b><span>${label}</span><small>${color}</small><b class="corner bottom">${label}</b>`;
     btn.onclick = () => playOneCard(card);
     hand.appendChild(btn);
   });
@@ -536,12 +548,12 @@ function renderOneCard(d, v) {
   const banner = $('oneCardStatus');
   if (v.phase === 'lobby') {
     banner.className = 'status them';
-    banner.textContent = v.canStart ? 'Ready - start now or let more players join.' : `Share the code. One-Card starts with ${v.minPlayers}+ players.`;
+    banner.textContent = v.canStart ? 'Ready - start now or let more players join.' : `Share the code. UNO starts with ${v.minPlayers}+ players.`;
   } else if (v.phase === 'over') {
     const won = v.winner === d.you;
     const winner = players.find(player => player.slot === v.winner);
     banner.className = 'status ' + (won ? 'win' : 'lose');
-    banner.textContent = won ? 'VICTORY - you emptied your hand' : `${winner ? winner.name : 'A rival'} emptied their hand.`;
+    banner.textContent = won ? 'VICTORY - UNO cleared' : `${winner ? winner.name : 'A rival'} emptied their hand.`;
   } else if (v.turn === d.you) {
     banner.className = 'status you';
     banner.textContent = v.legalCardIds.length ? 'YOUR PLAY - match color, number, or symbol' : 'No legal cards - draw one';
@@ -550,7 +562,7 @@ function renderOneCard(d, v) {
     banner.className = 'status them';
     banner.textContent = `${current ? current.name : 'A rival'} is choosing a card...`;
   }
-  $('oneCardLast').textContent = v.lastAction ? v.lastAction.text : 'First to empty their hand wins.';
+  $('oneCardLast').textContent = v.lastAction ? v.lastAction.text : 'First to empty their hand wins. Call it what it is: UNO.';
 }
 function chooseWildColor() {
   const color = prompt('Choose a color: red, gold, green, or blue', lastView.currentColor || 'red');
