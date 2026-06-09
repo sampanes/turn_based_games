@@ -20,6 +20,8 @@ public/?mode=computer&game=onecard
 ```
 
 The static client stores solo rooms in browser `localStorage`, so it does not need a server.
+live here:
+[https://sampanes.github.io/turn_based_games/]
 
 > Note: GitHub Pages project URLs use the repository name exactly. If the repository is named `turn_based_games`, the project URL contains `/turn_based_games/`, not `/turn-based-games/`.
 
