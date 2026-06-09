@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#06141b">
+<link rel="canonical" href="couch-armada/public/">
+<title>Couch Armada - Turn-Based Games</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --abyss: #06141b;
+    --deep: #0a1f2b;
+    --hull: #11313f;
+    --line: #1d4a5e;
+    --sonar: #34e7c4;
+    --sonar-dim: #1f8a78;
+    --amber: #ffb347;
+    --ink: #cfe9ec;
+    --mute: #7fa8b2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: var(--ink);
+    background:
+      radial-gradient(80% 60% at 50% 0%, #12384a 0%, transparent 58%),
+      linear-gradient(180deg, #06141b 0%, #030b10 100%);
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .2;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask: radial-gradient(80% 70% at 50% 35%, #000 0%, transparent 85%);
+  }
+  main {
+    width: min(100%, 620px);
+    position: relative;
+    border: 1px solid rgba(52, 231, 196, .28);
+    border-radius: 22px;
+    padding: clamp(22px, 5vw, 38px);
+    background: linear-gradient(180deg, rgba(17,49,63,.82), rgba(10,31,43,.72));
+    box-shadow: inset 0 1px 0 rgba(52,231,196,.1), 0 24px 70px rgba(0,0,0,.45);
+    overflow: hidden;
+  }
+  main::after {
+    content: "";
+    position: absolute;
+    right: -90px;
+    top: -90px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    border: 1px solid rgba(52,231,196,.22);
+    box-shadow: 0 0 44px rgba(52,231,196,.16), inset 0 0 38px rgba(52,231,196,.08);
+  }
+  h1 {
+    margin: 0;
+    color: var(--sonar);
+    font-size: clamp(34px, 10vw, 58px);
+    letter-spacing: 2px;
+    line-height: .95;
+    text-shadow: 0 0 22px rgba(52,231,196,.32);
+  }
+  .eyebrow {
+    margin: 0 0 12px;
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    font-size: 12px;
+  }
+  .lede {
+    margin: 18px 0 0;
+    color: var(--mute);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .actions {
+    display: grid;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  a.button {
+    display: block;
+    padding: 15px 18px;
+    border-radius: 12px;
+    text-align: center;
+    text-decoration: none;
+    color: #04231d;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(180deg, var(--sonar), var(--sonar-dim));
+    box-shadow: 0 12px 30px rgba(52,231,196,.18);
+  }
+  a.secondary {
+    color: var(--ink);
+    background: rgba(6,20,27,.72);
+    border: 1px solid var(--line);
+    box-shadow: none;
+  }
+  .games {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 22px;
+  }
+  .game {
+    border: 1px solid rgba(29,74,94,.85);
+    border-radius: 14px;
+    padding: 12px;
+    background: rgba(6,20,27,.45);
+  }
+  .game strong { color: var(--ink); display: block; margin-bottom: 4px; }
+  .game span { color: var(--mute); font-size: 12px; line-height: 1.5; }
+  footer {
+    margin-top: 22px;
+    color: #5f8c97;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  @media (max-width: 520px) { .games { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="eyebrow">GitHub Pages static build</p>
+  <h1>Couch Armada</h1>
+  <p class="lede">Mobile-first turn-based games. Play solo against a simple computer opponent now, or use the same shared game rules for server-backed two-player rooms later.</p>
+
+  <div class="actions">
+    <a class="button" href="couch-armada/public/">Launch game client</a>
+    <a class="button secondary" href="https://github.com/sampanes/turn-based-games">View source on GitHub</a>
+  </div>
+
+  <div class="games" aria-label="Available games">
+    <div class="game"><strong>Battleship</strong><span>Deploy a hidden fleet and trade shots across the grid.</span></div>
+    <div class="game"><strong>Connect Four</strong><span>Drop glowing discs and connect four before your rival does.</span></div>
+  </div>
+
+  <footer>If the launch button does not open, make sure GitHub Pages is serving this repository from the repo root and that <code>couch-armada/public/</code> exists in the published branch.</footer>
+</main>
+</body>
+</html>
