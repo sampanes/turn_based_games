@@ -204,10 +204,10 @@ battleship.meta = {
 
 if (typeof module !== 'undefined' && module.exports) module.exports = battleship;
 if (typeof window !== 'undefined') {
-  if (window.CouchArmadaRegistry) {
-    window.CouchArmadaRegistry.registerGame({ ...battleship.meta, module: battleship });
+  if (window.TurnBasedGamesRegistry) {
+    window.TurnBasedGamesRegistry.registerGame({ ...battleship.meta, module: battleship });
   } else {
-    window.CouchArmadaGames = window.CouchArmadaGames || {};
-    window.CouchArmadaGames.battleship = battleship;
+    window.TurnBasedGames = window.TurnBasedGames || {};
+    window.TurnBasedGames.battleship = battleship;
   }
 }

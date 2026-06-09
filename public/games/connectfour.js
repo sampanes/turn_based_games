@@ -171,10 +171,10 @@ const connectfour = {
 
 if (typeof module !== 'undefined' && module.exports) module.exports = connectfour;
 if (typeof window !== 'undefined') {
-  if (window.CouchArmadaRegistry) {
-    window.CouchArmadaRegistry.registerGame({ ...connectfour.meta, module: connectfour });
+  if (window.TurnBasedGamesRegistry) {
+    window.TurnBasedGamesRegistry.registerGame({ ...connectfour.meta, module: connectfour });
   } else {
-    window.CouchArmadaGames = window.CouchArmadaGames || {};
-    window.CouchArmadaGames.connectfour = connectfour;
+    window.TurnBasedGames = window.TurnBasedGames || {};
+    window.TurnBasedGames.connectfour = connectfour;
   }
 }

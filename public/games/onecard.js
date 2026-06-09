@@ -241,10 +241,10 @@ const onecard = {
 
 if (typeof module !== 'undefined' && module.exports) module.exports = onecard;
 if (typeof window !== 'undefined') {
-  if (window.CouchArmadaRegistry) {
-    window.CouchArmadaRegistry.registerGame({ ...onecard.meta, module: onecard });
+  if (window.TurnBasedGamesRegistry) {
+    window.TurnBasedGamesRegistry.registerGame({ ...onecard.meta, module: onecard });
   } else {
-    window.CouchArmadaGames = window.CouchArmadaGames || {};
-    window.CouchArmadaGames.onecard = onecard;
+    window.TurnBasedGames = window.TurnBasedGames || {};
+    window.TurnBasedGames.onecard = onecard;
   }
 }

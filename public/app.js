@@ -9,12 +9,12 @@ let lastView = null;
 let boardSize = 10;
 
 // ---- browser session persistence
-function loadSession() { try { return JSON.parse(localStorage.getItem('armada')); } catch { return null; } }
-function setSession(s) { session = s; localStorage.setItem('armada', JSON.stringify(s)); }
+function loadSession() { try { return JSON.parse(localStorage.getItem('turnBasedGames')); } catch { return null; } }
+function setSession(s) { session = s; localStorage.setItem('turnBasedGames', JSON.stringify(s)); }
 function clearSession() {
-  if (session && window.CouchArmadaSolo) window.CouchArmadaSolo.clearRoom(session);
+  if (session && window.TurnBasedGamesSolo) window.TurnBasedGamesSolo.clearRoom(session);
   session = null;
-  localStorage.removeItem('armada');
+  localStorage.removeItem('turnBasedGames');
 }
 
 function show(id) {
@@ -29,12 +29,12 @@ function toast(msg) {
 }
 
 function gameCatalog() {
-  if (window.CouchArmadaRegistry) return window.CouchArmadaRegistry.listGames();
-  return Object.entries(window.CouchArmadaGames || {}).map(([id, module]) => ({ id, name: id, module }));
+  if (window.TurnBasedGamesRegistry) return window.TurnBasedGamesRegistry.listGames();
+  return Object.entries(window.TurnBasedGames || {}).map(([id, module]) => ({ id, name: id, module }));
 }
 function gameMeta(id) {
-  if (window.CouchArmadaRegistry) return window.CouchArmadaRegistry.getGame(id);
-  const module = (window.CouchArmadaGames || {})[id];
+  if (window.TurnBasedGamesRegistry) return window.TurnBasedGamesRegistry.getGame(id);
+  const module = (window.TurnBasedGames || {})[id];
   return module ? { id, name: id, module } : null;
 }
 function availableGames() {
@@ -42,6 +42,27 @@ function availableGames() {
 }
 function currentGameMeta() { return gameMeta(session && session.game) || gameMeta(selectedGameId()); }
 function selectedGameId() { return $('gameSelect').value || 'battleship'; }
+
+function launchParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    mode: params.get('mode'),
+    game: params.get('game'),
+  };
+}
+function applyLaunchGame(gameId) {
+  const select = $('gameSelect');
+  if (!select || !gameId || !gameMeta(gameId)) return;
+  select.value = gameId;
+}
+function clearLaunchParams() {
+  if (!window.history || !window.history.replaceState) return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete('mode');
+  url.searchParams.delete('game');
+  window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+}
+
 function populateGameSelect() {
   const select = $('gameSelect');
   if (!select) return;
@@ -55,7 +76,7 @@ function populateGameSelect() {
   }
 }
 function soloApi(path, method, body) {
-  return window.CouchArmadaSolo.handle(path, method, body, session, { gameMeta, selectedGameId });
+  return window.TurnBasedGamesSolo.handle(path, method, body, session, { gameMeta, selectedGameId });
 }
 
 async function api(path, method, body) {
@@ -572,6 +593,11 @@ document.addEventListener('keydown', e => {
 });
 
 populateGameSelect();
+const params = launchParams();
+applyLaunchGame(params.game);
 session = loadSession();
 if (session) { show('battle'); enterRoom(); }
-else show('home');
+else if (params.mode === 'computer') {
+  show('home');
+  createComputerGame().finally(clearLaunchParams);
+} else show('home');

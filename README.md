@@ -1,39 +1,44 @@
-# Couch Armada
+# Turn-Based Games
 
-Couch Armada is a small self-hosted server for two-player turn-based games. It
-uses no ads, accounts, analytics, or third-party game service. The first bundled
-games are Battleship and Connect Four. The mobile-first browser client also has a static "play the
-computer" mode that can run on GitHub Pages.
+Turn-Based Games is a small collection of browser-friendly turn-based games with two deployment modes:
 
-Live GitHub Pages build: https://sampanes.github.io/turn-based-games/
+- **Static player-vs-computer mode** for GitHub Pages. The repository root is a landing page, and the playable client lives in `public/`.
+- **Live room-code multiplayer mode** for a Node server. The server uses the same shared game-rule modules from `public/games/` so solo and multiplayer rules stay aligned.
 
-The repository root includes a tiny redirect page so that GitHub Pages URL opens
-the static client in `couch-armada/public/`.
+There are no runtime npm dependencies.
 
-Game state is stored in `data.json`, which is created on first run. That file can
-include room codes, player display names, game tokens, and in-progress boards, so
-it is intentionally ignored by Git.
+## Play On GitHub Pages
 
-## Run
+Publish this repository from the default branch root. The root `index.html` is the GitHub Pages landing page for player-vs-computer games and links into the static client under `public/`.
 
-Couch Armada requires Node 16+ and has no package dependencies.
-
-```bash
-cd couch-armada
-node server.js
-```
-
-Expected output:
+Static solo links use query parameters such as:
 
 ```text
-Couch Armada running at http://0.0.0.0:8080
+public/?mode=computer&game=battleship
+public/?mode=computer&game=connectfour
+public/?mode=computer&game=onecard
+```
+
+The static client stores solo rooms in browser `localStorage`, so it does not need a server.
+
+> Note: GitHub Pages project URLs use the repository name exactly. If the repository is named `turn_based_games`, the project URL contains `/turn_based_games/`, not `/turn-based-games/`.
+
+## Run Locally With Multiplayer
+
+Turn-Based Games requires Node 16+.
+
+```bash
+npm start
+```
+
+By default, the server listens on all interfaces on port 8080:
+
+```text
+Turn-Based Games running at http://0.0.0.0:8080
 LAN clients can open http://<server-ip>:8080
 ```
 
-To test on a local network, find the host IP address and open
-`http://<server-ip>:8080` from another device on the same network. One player starts a game and shares the 4-character room code; other players
-join with that code. Most games are two-player, while One-Card supports up to
-four players before the host starts the hand.
+To test on a local network, find the host IP address and open `http://<server-ip>:8080` from another device on the same network. One player starts a game and shares the 4-character room code; other players join with that code. Most games are two-player, while One-Card supports up to four players before the host starts the hand.
 
 The port can be changed with:
 
@@ -43,149 +48,94 @@ PORT=3000 node server.js
 
 ## Test
 
-The smoke test starts the server on a temporary local port and exercises the main
-Battleship API flow, Connect Four room creation and move handling, and the multiplayer One-Card lobby/start flow.
+The smoke test starts the server on a temporary local port and exercises the main Battleship API flow, Connect Four room creation and move handling, and the multiplayer One-Card lobby/start flow.
 
 ```bash
-cd couch-armada
 npm test
 ```
 
 ## Project Layout
 
 ```text
-index.html               GitHub Pages redirect to the static client
-couch-armada/
-  server.js              shared HTTP server, API, rooms, persistence
+index.html             GitHub Pages landing page for static solo play
+404.html               GitHub Pages fallback that returns to the static landing page
+package.json           Node scripts for the live multiplayer server and smoke test
+server.js              shared HTTP server, API, rooms, persistence
+public/
+  index.html           mobile-first game client for computer and live server modes
+  app.js               shared browser controller for sessions, polling, launch params, and UI state
+  solo.js              GitHub Pages/localStorage API adapter for computer play
   games/
-    index.js             server game registry
-    battleship.js        server wrapper around the shared Battleship rules
-    connectfour.js       server wrapper around the shared Connect Four rules
-    onecard.js           server wrapper around the shared One-Card rules
-  public/
-    index.html           mobile-first shell for online and computer modes
-    app.js               shared browser controller for sessions, polling, and UI state
-    solo.js              GitHub Pages/localStorage API adapter for computer play
-    games/
-      registry.js        browser game catalog for static pages
-      battleship.js      shared Battleship rules used by browser and server
-      connectfour.js     shared Connect Four rules and basic computer opponent
-      onecard.js         shared One-Card rules for 2-4 players and solo bots
-    manifest.json        mobile web app metadata
-  test/
-    smoke.js             zero-dependency HTTP smoke test
+    registry.js        browser game catalog for static pages
+    battleship.js      shared Battleship rules used by browser and server
+    connectfour.js     shared Connect Four rules and basic computer opponent
+    onecard.js         shared One-Card rules for 2-4 players and solo bots
+  manifest.json        mobile web app metadata
+server/
+  games/               Node wrappers that expose the shared browser rules to server.js
+test/
+  smoke.js             zero-dependency HTTP smoke test
 ```
 
 ## Run As A Service
 
-For a Linux host using systemd, create `/etc/systemd/system/armada.service`:
+For a Linux host using systemd, create `/etc/systemd/system/turn-based-games.service`:
 
 ```ini
 [Unit]
-Description=Couch Armada
+Description=Turn-Based Games
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/node /opt/couch-armada/server.js
-WorkingDirectory=/opt/couch-armada
+ExecStart=/usr/bin/node /opt/turn-based-games/server.js
+WorkingDirectory=/opt/turn-based-games
 Restart=always
-User=armada
+User=games
 Environment=PORT=8080
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Adjust `ExecStart`, `WorkingDirectory`, and `User` for the deployment target.
-Then enable the service:
+Adjust `ExecStart`, `WorkingDirectory`, and `User` for the deployment target. Then enable the service:
 
 ```bash
-sudo systemctl enable --now armada
-sudo systemctl status armada
-journalctl -u armada -f
+sudo systemctl enable --now turn-based-games
+sudo systemctl status turn-based-games
+journalctl -u turn-based-games -f
 ```
 
-## Remote Access
+## Remote Access For Multiplayer
 
-Remote play requires a reachable HTTPS URL or private network path to the host.
-Common options:
+Remote play requires a reachable HTTPS URL or private network path to the host. Common options include Cloudflare Tunnel, Tailscale, or a carefully configured port forward plus dynamic DNS.
 
-### Cloudflare Tunnel
-
-Cloudflare Tunnel can expose the local server over HTTPS without opening inbound
-ports on the router.
-
-```bash
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o cloudflared
-chmod +x cloudflared
-sudo mv cloudflared /usr/local/bin/
-
-cloudflared tunnel --url http://localhost:8080
-```
-
-The command prints a temporary `https://...trycloudflare.com` URL. For a stable
-URL, configure a named tunnel in Cloudflare.
-
-### Tailscale
-
-Tailscale can make the server reachable only to devices in the same tailnet. This
-avoids public inbound ports, but each player device needs Tailscale installed and
-signed in.
-
-### Port Forwarding And Dynamic DNS
-
-A router port forward plus dynamic DNS also works. This is the most exposed
-option and should only be used when the host and router are configured
-appropriately.
-
-## Install As A Mobile Web App
-
-Open the server URL in a mobile browser and use the browser's "Add to Home
-screen" action. HTTPS is recommended for the best install behavior.
-
-## Static GitHub Pages / Computer Opponent Mode
-
-The app can be hosted as static files for solo play. Publish the contents of
-`couch-armada/public/` to GitHub Pages and keep `app.js`, `solo.js`, and the
-`games/` directory beside `index.html`. The "Play the computer" button stores the
-whole room in browser `localStorage`, so it works without a server.
+## Static Solo Architecture
 
 Solo mode deliberately calls the same game hooks as the HTTP server:
 
 - `init()` creates the room state.
-- `validateSetup()` validates and commits both fleets.
+- `validateSetup()` validates and commits setup when a game has setup.
 - `applyMove()` applies both human and computer turns.
 - `viewFor()` renders the player-specific board.
-- Optional `computerSetup()`, `computerPlayers()`, and `computerMove()` hooks let static solo mode seat one or more bots, set them up, and take basic opponent turns without duplicating rule logic.
+- Optional `computerSetup()`, `computerPlayers()`, and `computerMove()` hooks let static solo mode seat bots, set them up, and take basic opponent turns without duplicating rule logic.
 
-That keeps turn order, hidden information, win conditions, and move validation
-aligned with the future online server mode instead of copying game rules into the
-client.
+That keeps turn order, hidden information, win conditions, and move validation aligned with live multiplayer instead of copying game rules into the client.
 
 ## Adding Games
 
-The server keeps room, turn, identity, and persistence plumbing separate from game
-rules. A shared game module in `public/games/` exports these hooks in a browser
-and Node-compatible format:
+The server keeps room, turn, identity, and persistence plumbing separate from game rules. A shared game module in `public/games/` exports these hooks in a browser and Node-compatible format:
 
 - `init()`
 - `validateSetup(state, player, setup)`
-- `applyMove(state, player, move)`
-- `viewFor(state, player)`
+- `applyMove(state, player, move, players)`
+- `viewFor(state, player, players)`
 
-The `public/games/battleship.js` module is the reference implementation. Add
-another game by creating a module in `public/games/`, giving it metadata, and
-registering it through `public/games/registry.js` for static play. Register the
-same module for the server in `games/index.js`, add a `<script>` tag in
-`public/index.html`, and add or map the matching mobile-first UI. Expose
-`computerSetup()` and `computerMove()` when the game supports GitHub Pages solo
-play so `public/solo.js` can remain generic while each game owns its own basic
-opponent behavior.
+The `public/games/battleship.js` module is the reference implementation. Add another game by creating a module in `public/games/`, giving it metadata, and registering it through `public/games/registry.js` for static play. Register the same module for the server in `server/games/index.js`, add a `<script>` tag in `public/index.html`, and add or map the matching mobile-first UI. Expose `computerSetup()` and `computerMove()` when the game supports GitHub Pages solo play so `public/solo.js` can remain generic while each game owns its own basic opponent behavior.
 
 ## Notes
 
 - Battleship uses one shot per turn with strict alternation.
 - Connect Four uses standard 7-column, 6-row gravity drops and detects horizontal, vertical, and diagonal fours.
 - One-Card is an UNO-like shedding game for 2-4 server players; static solo play seats the human against three first-legal-card computer players.
-- To reset local state, stop the server, delete `data.json`, and start it again.
-- Battleship and Connect Four rooms are two-player only. One-Card rooms accept up to four players while still in the lobby, and a full or already-started room rejects additional joins.
+- To reset local multiplayer state, stop the server, delete `data.json`, and start it again.
+- To reset static solo state, clear the browser's local storage for the site.

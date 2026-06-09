@@ -1,5 +1,5 @@
-(function registerArmadaRegistry(root) {
-  const existing = root.CouchArmadaRegistry;
+(function registerTurnBasedGamesRegistry(root) {
+  const existing = root.TurnBasedGamesRegistry;
   const games = existing && existing.games ? existing.games : {};
 
   function registerGame(definition) {
@@ -13,8 +13,8 @@
       ui: definition.ui || definition.id,
       ...definition,
     };
-    root.CouchArmadaGames = root.CouchArmadaGames || {};
-    root.CouchArmadaGames[definition.id] = definition.module;
+    root.TurnBasedGames = root.TurnBasedGames || {};
+    root.TurnBasedGames[definition.id] = definition.module;
     return games[definition.id];
   }
 
@@ -26,5 +26,5 @@
     return Object.values(games);
   }
 
-  root.CouchArmadaRegistry = { games, registerGame, getGame, listGames };
+  root.TurnBasedGamesRegistry = { games, registerGame, getGame, listGames };
 })(window);

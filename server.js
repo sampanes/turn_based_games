@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Couch Armada - a tiny self-hosted server for playing turn-based games
+ * Turn-Based Games - a tiny self-hosted server for turn-based games
  * with one other person, async, with no accounts and no ads.
  *
  * Zero external dependencies. Runs on any host with Node 16+:
@@ -9,7 +9,8 @@
  * State lives in ./data.json next to this file. Back it up to preserve
  * in-progress games; deleting it wipes all rooms.
  *
- * Game rules live in ./games. The server owns rooms, turns, identity, API
+ * Game rules live in ./server/games and shared browser rules live in ./public/games.
+ * The server owns rooms, turns, identity, API
  * routing, static files, and persistence.
  */
 
@@ -17,7 +18,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const games = require('./games');
+const games = require('./server/games');
 
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -205,6 +206,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   const address = server.address();
   const actualPort = address && typeof address === 'object' ? address.port : PORT;
-  console.log(`Couch Armada running at http://${HOST}:${actualPort}`);
+  console.log(`Turn-Based Games running at http://${HOST}:${actualPort}`);
   console.log(`LAN clients can open http://<server-ip>:${actualPort}`);
 });
