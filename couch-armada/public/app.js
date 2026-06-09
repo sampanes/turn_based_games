@@ -12,14 +12,16 @@ let boardSize = 10;
 function loadSession() { try { return JSON.parse(localStorage.getItem('armada')); } catch { return null; } }
 function setSession(s) { session = s; localStorage.setItem('armada', JSON.stringify(s)); }
 function clearSession() {
-  if (window.CouchArmadaSolo) window.CouchArmadaSolo.clearRoom(session);
+  if (session && window.CouchArmadaSolo) window.CouchArmadaSolo.clearRoom(session);
   session = null;
   localStorage.removeItem('armada');
 }
 
 function show(id) {
-  ['home','lobby','placement','battle','connectFour'].forEach(s => $(s).classList.toggle('hidden', s !== id));
-  ['home','lobby','placement','battle'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+  ['home','lobby','placement','battle','connectFour'].forEach(section => {
+    const el = $(section);
+    if (el) el.classList.toggle('hidden', section !== id);
+  });
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -95,8 +97,22 @@ async function joinGame() {
 }
 function leaveGame() {
   if (!confirm('Leave this game? This clears the saved local session for this device.')) return;
-  clearSession(); stopPoll(); resetGameUi(); show('home');
-  clearSession(); stopPoll(); resetPlacement(); show('home');
+  clearSession();
+  stopPoll();
+  resetGameUi();
+  lastView = null;
+  show('home');
+  $('foot').textContent = '';
+}
+
+async function copyRoomCode() {
+  if (!session || !session.room) return;
+  try {
+    await navigator.clipboard.writeText(session.room);
+    toast('Room code copied.');
+  } catch {
+    toast(`Code: ${session.room}`);
+  }
 }
 
 function enterRoom() { startPoll(); poll(); }
@@ -115,7 +131,10 @@ async function poll() {
 }
 
 function render(d) {
-  const v = d.view; lastView = v; fleetDef = v.fleet; boardSize = v.size || boardSize;
+  const v = d.view;
+  lastView = v;
+  fleetDef = v.fleet || fleetDef || [];
+  boardSize = v.size || boardSize;
   $('foot').textContent = `Game ${session.room} - ${d.youName}` + (d.opponentName ? ` vs ${d.opponentName}` : '');
 
   if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; return; }
@@ -134,7 +153,7 @@ function render(d) {
     } else {
       show('placement'); $('placeWait').classList.add('hidden');
       document.querySelectorAll('#placement .grid, #placement .fleet, #placement .row, #readyBtn, #placeHint').forEach(el => el.classList.remove('hidden'));
-      if (!$('placeGrid').children.length) initPlacement();
+      if (!$('placeGrid').children.length || $('placeGrid').dataset.size !== String(boardSize)) initPlacement();
     }
     return;
   }
@@ -153,16 +172,29 @@ function resetGameUi() {
 }
 
 // ---------------- placement ----------------
-function resetPlacement() { placedShips = []; selectedShip = null; orient = 'H'; $('placeGrid').innerHTML = ''; $('fleetList').innerHTML = ''; }
+function resetPlacement() {
+  placedShips = [];
+  selectedShip = null;
+  orient = 'H';
+  $('placeGrid').innerHTML = '';
+  $('placeGrid').dataset.size = '';
+  $('fleetList').innerHTML = '';
+  $('orientBtn').textContent = 'Heading: East';
+  $('readyBtn').disabled = true;
+}
 
 function initPlacement() {
   resetPlacement();
   const g = $('placeGrid');
+  g.dataset.size = String(boardSize);
   g.style.gridTemplateColumns = `repeat(${boardSize}, 1fr)`;
   for (let r = 0; r < boardSize; r++) for (let c = 0; c < boardSize; c++) {
     const cell = document.createElement('div');
     cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
     cell.onclick = () => placeAt(r, c);
+    cell.onmouseenter = () => previewPlacement(r, c);
+    cell.onmouseleave = () => renderPlaceGrid();
+    cell.ontouchstart = () => previewPlacement(r, c);
     g.appendChild(cell);
   }
   // default selection = first ship
@@ -216,12 +248,29 @@ function placeAt(r, c) {
   renderFleetList(); renderPlaceGrid();
 }
 
-function renderPlaceGrid() {
+function renderPlaceGrid(preview = []) {
   const occ = occupiedSet();
+  const previewSet = new Set(preview.map(item => item.key));
+  const blocked = preview.some(item => item.blocked);
   document.querySelectorAll('#placeGrid .cell').forEach(cell => {
     const key = `${cell.dataset.r},${cell.dataset.c}`;
-    cell.className = 'cell' + (occ.has(key) ? ' ship' : '');
+    let cls = 'cell';
+    if (occ.has(key)) cls += ' ship';
+    if (previewSet.has(key)) cls += blocked ? ' blocked' : ' preview';
+    cell.className = cls;
   });
+}
+
+function previewPlacement(r, c) {
+  if (selectedShip == null || !fleetDef[selectedShip]) return;
+  const def = fleetDef[selectedShip];
+  if (placedShips.find(p => p.name === def.name)) return;
+  const occ = occupiedSet();
+  const preview = shipCells(r, c, def.size).map(key => {
+    const [rr, cc] = key.split(',').map(Number);
+    return { key, blocked: rr < 0 || rr >= boardSize || cc < 0 || cc >= boardSize || occ.has(key) };
+  });
+  renderPlaceGrid(preview);
 }
 
 function toggleOrient() {
@@ -393,6 +442,13 @@ async function dropConnectDisc(c) {
 // ---------------- boot ----------------
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+document.addEventListener('keydown', e => {
+  if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
+  if (!session) return;
+  if (e.key.toLowerCase() === 'r' && !$('placement').classList.contains('hidden')) toggleOrient();
+  const n = Number(e.key);
+  if (n >= 1 && n <= 7 && lastView && lastView.ui === 'connectfour') dropConnectDisc(n - 1);
+});
 
 populateGameSelect();
 session = loadSession();
