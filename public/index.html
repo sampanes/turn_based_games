@@ -31,13 +31,16 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; }
   body {
+    --tap-target: 48px;
+    --page-pad: 12px;
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     background:
       radial-gradient(120% 80% at 50% -10%, #0e2c3a 0%, var(--abyss) 60%) fixed,
       var(--abyss);
     color: var(--ink);
     min-height: 100vh;
-    padding: env(safe-area-inset-top) 14px calc(env(safe-area-inset-bottom) + 24px);
+    min-height: 100dvh;
+    padding: env(safe-area-inset-top) var(--page-pad) calc(env(safe-area-inset-bottom) + 24px);
   }
   /* faint sonar sweep grid texture behind everything */
   body::before {
@@ -48,7 +51,7 @@
     background-size: 34px 34px;
     mask: radial-gradient(80% 60% at 50% 30%, #000 0%, transparent 80%);
   }
-  .wrap { position: relative; z-index: 1; max-width: 560px; margin: 0 auto; }
+  .wrap { position: relative; z-index: 1; width: min(100%, 960px); max-width: 560px; margin: 0 auto; }
   header { text-align: center; padding: 22px 0 6px; }
   h1 {
     font-family: 'Saira Stencil One', cursive; font-weight: 400;
@@ -59,20 +62,20 @@
   .card {
     background: linear-gradient(180deg, rgba(17,49,63,.7), rgba(10,31,43,.7));
     border: 1px solid var(--line); border-radius: 14px;
-    padding: 18px; margin-top: 16px;
+    padding: 14px; margin-top: 14px;
     box-shadow: inset 0 1px 0 rgba(52,231,196,.06), 0 14px 40px rgba(0,0,0,.4);
   }
   h2 { font-size: 15px; letter-spacing: 1px; text-transform: uppercase; color: var(--sonar); margin: 0 0 12px; }
   p.lede { color: var(--mute); font-size: 13px; line-height: 1.6; margin: 0 0 14px; }
   label { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mute); margin: 12px 0 6px; }
   input, select {
-    width: 100%; background: var(--abyss); border: 1px solid var(--line); color: var(--ink);
+    width: 100%; min-height: var(--tap-target); background: var(--abyss); border: 1px solid var(--line); color: var(--ink);
     font-family: inherit; font-size: 16px; padding: 12px 14px; border-radius: 9px; letter-spacing: 1px;
   }
   input:focus, select:focus { outline: none; border-color: var(--sonar-dim); box-shadow: 0 0 0 3px rgba(52,231,196,.12); }
   input.code { text-transform: uppercase; font-size: 22px; letter-spacing: 6px; text-align: center; }
   button {
-    font-family: inherit; cursor: pointer; border-radius: 9px; font-size: 14px; letter-spacing: 1px;
+    min-height: var(--tap-target); font-family: inherit; cursor: pointer; border-radius: 9px; font-size: 14px; letter-spacing: 1px;
     padding: 12px 16px; border: 1px solid var(--line); background: var(--hull); color: var(--ink);
     transition: transform .06s ease, background .15s ease, border-color .15s ease;
   }
@@ -107,7 +110,7 @@
   .board-label .left { font-size: 11px; color: var(--mute); letter-spacing: 1px; }
   .grid {
     display: grid; grid-template-columns: repeat(10, 1fr); gap: var(--grid-gap);
-    aspect-ratio: 1; width: 100%;
+    aspect-ratio: 1; width: min(100%, calc(100dvh - 230px)); min-width: 0; margin-inline: auto;
     background: var(--line); border: 2px solid var(--line); border-radius: 8px; padding: var(--grid-gap);
   }
   .cell {
@@ -116,6 +119,7 @@
     aspect-ratio: 1;
   }
   .grid.fire .cell { cursor: crosshair; }
+  .is-phone .grid.fire .cell, .is-phone #placeGrid .cell { cursor: pointer; }
   .cell.ship { background: #2c5a6b; box-shadow: inset 0 0 0 1px #3c7a90; }
   .cell.hit { background: var(--fire); }
   .cell.hit::after { content: "X"; color: #2a0604; }
@@ -132,7 +136,7 @@
   .fleet { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
   .ship-row {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--abyss); cursor: pointer;
+    min-height: var(--tap-target); padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--abyss); cursor: pointer;
   }
   .ship-row.active { border-color: var(--sonar); background: rgba(52,231,196,.08); }
   .ship-row.done { opacity: .55; }
@@ -163,9 +167,9 @@
     background: radial-gradient(circle at 50% 18%, transparent 0 18%, rgba(52,231,196,.16) 19%, transparent 20%) 0 0/42px 42px;
   }
   .connect-panel > * { position: relative; z-index: 1; }
-  .connect-stage { margin-top: 14px; padding: 12px; border: 1px solid rgba(52,231,196,.22); border-radius: 18px; background: linear-gradient(180deg, #082838, #041018); box-shadow: inset 0 0 30px rgba(52,231,196,.08), 0 18px 40px rgba(0,0,0,.35); }
+  .connect-stage { margin-top: 14px; padding: 10px; border: 1px solid rgba(52,231,196,.22); border-radius: 18px; background: linear-gradient(180deg, #082838, #041018); box-shadow: inset 0 0 30px rgba(52,231,196,.08), 0 18px 40px rgba(0,0,0,.35); }
   .connect-columns { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin-bottom: 8px; }
-  .drop-btn { min-height: 40px; padding: 8px 0; border-radius: 999px; background: rgba(52,231,196,.08); color: var(--sonar); border-color: rgba(52,231,196,.28); font-size: 18px; line-height: 1; }
+  .drop-btn { min-height: var(--tap-target); padding: 8px 0; border-radius: 999px; background: rgba(52,231,196,.08); color: var(--sonar); border-color: rgba(52,231,196,.28); font-size: 18px; line-height: 1; }
   .drop-btn:disabled { opacity: .28; cursor: not-allowed; }
   .connect-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; padding: 10px; border-radius: 16px; background: linear-gradient(160deg, #0d4b67, #072233); border: 1px solid rgba(52,231,196,.28); box-shadow: inset 0 0 22px rgba(0,0,0,.55); }
   .connect-cell { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #12394a, #061923 72%); box-shadow: inset 0 6px 12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
@@ -214,11 +218,77 @@
   .color-dot { width: 18px; height: 18px; border-radius: 50%; opacity: .35; border: 2px solid rgba(255,255,255,.35); }
   .color-dot.active { opacity: 1; transform: scale(1.15); box-shadow: 0 0 14px currentColor; }
   .color-dot.red { background: #ff5b51; color: #ff5b51; } .color-dot.gold { background: #ffcf52; color: #ffcf52; } .color-dot.green { background: #34e78a; color: #34e78a; } .color-dot.blue { background: #58b7ff; color: #58b7ff; }
-  .one-card-hand { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 8px; }
-  .one-card-hand .one-card-card { min-height: 132px; }
+  .one-card-hand { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 8px; }
+  .one-card-hand .one-card-card { min-height: 126px; }
   .one-card-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .one-card-last { min-height: 20px; text-align: center; color: var(--mute); font-size: 12px; }
   @media (min-width: 520px) { .one-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+
+  /* Mobile-first ergonomics: JS adds .is-phone for likely cellphones, while
+     pointer media queries cover touch-first browsers that hide UA details. */
+  .orientation-note {
+    display: none; margin-top: 12px; padding: 12px; border: 1px dashed rgba(255,179,71,.45);
+    border-radius: 12px; color: var(--amber); background: rgba(255,179,71,.08); font-size: 13px; line-height: 1.45;
+  }
+  body.is-phone { --tap-target: 54px; --page-pad: max(8px, env(safe-area-inset-left)); touch-action: manipulation; }
+  body.is-phone header { padding-top: 14px; }
+  body.is-phone .tag { font-size: 10px; letter-spacing: 2.2px; }
+  body.is-phone .card { border-radius: 16px; padding: 12px; }
+  body.is-phone button { font-size: 15px; font-weight: 600; }
+  body.is-phone .row { flex-direction: column; }
+  body.is-phone .status { position: sticky; top: env(safe-area-inset-top); z-index: 5; padding: 14px 12px; }
+  body.is-phone .board-label { margin-top: 14px; }
+  body.is-phone .grid { width: min(100%, calc(100dvh - 210px)); border-width: 1px; }
+  body.is-phone #battle .grid, body.is-phone #placement .grid { max-width: 430px; }
+  body.is-phone #battle .grid + .board-label { margin-top: 20px; }
+  body.is-phone .cell { border-radius: 3px; }
+  body.is-phone .ship-row { min-height: 54px; }
+  body.is-phone .connect-stage { padding: 8px; margin-inline: -4px; }
+  body.is-phone .connect-columns, body.is-phone .connect-board { gap: 5px; }
+  body.is-phone .connect-board { padding: 8px; }
+  body.is-phone .drop-btn { font-size: 22px; padding-block: 10px; }
+  body.is-phone .one-opponents { grid-template-columns: 1fr; }
+  body.is-phone .one-opponent { min-height: 50px; flex-direction: row; align-items: center; }
+  body.is-phone .one-card-center { padding: 10px; gap: 10px; }
+  body.is-phone .one-card-toolbar { grid-template-columns: 1fr; }
+  body.is-phone .one-card-hand { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  body.is-phone .one-card-hand .one-card-card { min-height: 136px; }
+  body.is-phone .toast { width: min(92vw, 420px); text-align: center; bottom: calc(env(safe-area-inset-bottom) + 18px); }
+  body.is-phone.needs-landscape .orientation-note.landscape-required,
+  body.is-phone.needs-portrait .orientation-note.portrait-recommended { display: block; }
+  body.is-phone.needs-landscape:not(.is-landscape) .orientation-note.landscape-required { display: block; border-color: var(--fire); color: #ffd6d2; background: rgba(255,91,81,.12); }
+
+  @media (hover: none), (pointer: coarse) {
+    :root { --grid-gap: 3px; }
+    button, input, select { min-height: 54px; }
+    .drop-btn { min-height: 54px; }
+  }
+  @media (min-width: 720px) {
+    body { --page-pad: 24px; }
+    .wrap { max-width: 1040px; }
+    .card { padding: 22px; }
+    #battle.card { display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; align-items: start; }
+    #battle #statusBanner, #battle .ghost { grid-column: 1 / -1; }
+    #battle .board-label { margin-top: 18px; }
+    #battle .grid { width: 100%; }
+    .connect-panel, .one-card-panel, #placement.card, #home.card, #lobby.card { max-width: 620px; margin-left: auto; margin-right: auto; }
+    .one-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (max-width: 380px) {
+    body.is-phone .card { padding: 10px; }
+    body.is-phone .grid { --grid-gap: 1px; }
+    body.is-phone .one-card-hand .one-card-card { min-height: 124px; }
+  }
+  @media (orientation: landscape) and (max-height: 520px) {
+    body.is-phone header { display: none; }
+    body.is-phone .card { margin-top: 8px; }
+    body.is-phone #placement.card, body.is-phone #battle.card, body.is-phone #connectFour.card { max-width: none; }
+    body.is-phone .grid { width: min(42vw, calc(100dvh - 86px)); }
+    body.is-phone #battle.card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+    body.is-phone #battle #statusBanner, body.is-phone #battle .ghost { grid-column: 1 / -1; }
+    body.is-phone .connect-stage { max-width: min(82vw, 680px); margin-left: auto; margin-right: auto; }
+  }
 
   .hidden { display: none !important; }
 </style>
@@ -262,6 +332,8 @@
   <!-- PLACEMENT -->
   <section id="placement" class="card hidden">
     <h2>Deploy your fleet</h2>
+    <div class="orientation-note portrait-recommended">Portrait is recommended for ship placement so the full grid fits under your thumb.</div>
+    <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
     <p class="lede" id="placeHint">Pick a ship, set the heading, then tap a square to drop its bow. Tap a placed ship to pull it back.</p>
     <div class="row">
       <button id="orientBtn" onclick="toggleOrient()">Heading: East</button>
@@ -275,6 +347,8 @@
 
   <!-- BATTLE -->
   <section id="battle" class="card hidden">
+    <div class="orientation-note portrait-recommended">Portrait is recommended for Battleship. Rotate only if you want both boards side-by-side.</div>
+    <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
     <div id="statusBanner" class="status">...</div>
     <div class="board-label">
       <h3 style="color:var(--fire)">Enemy waters</h3>
@@ -292,6 +366,8 @@
 
   <!-- CONNECT FOUR -->
   <section id="connectFour" class="card connect-panel hidden">
+    <div class="orientation-note portrait-recommended">Portrait is recommended for Connect Four with larger column drop buttons.</div>
+    <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
     <div id="connectStatus" class="status">...</div>
     <div class="connect-stage">
       <div class="connect-columns" id="connectColumns"></div>
@@ -307,6 +383,8 @@
 
   <!-- UNO -->
   <section id="oneCard" class="card one-card-panel hidden">
+    <div class="orientation-note portrait-recommended">Portrait is recommended for UNO so your hand uses large two-column cards.</div>
+    <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
     <div id="oneCardStatus" class="status">...</div>
     <div class="one-card-table mt">
       <div id="oneCardCodeWrap" class="one-card-code hidden">

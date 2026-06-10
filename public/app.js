@@ -8,6 +8,30 @@ let pollTimer = null;
 let lastView = null;
 let boardSize = 10;
 
+// ---- mobile / orientation ergonomics
+function isLikelyPhone() {
+  const uaPhone = /Android.*Mobile|iPhone|iPod|Windows Phone|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const narrow = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 540;
+  return uaPhone || (coarse && narrow);
+}
+function gameOrientationPreference(meta) {
+  const preferred = (lastView && lastView.preferredOrientation) || (meta && meta.preferredOrientation) || 'portrait';
+  const required = (lastView && lastView.requiredOrientation) || (meta && meta.requiredOrientation) || null;
+  return { preferred, required };
+}
+function applyDeviceClasses(activeSection) {
+  const meta = currentGameMeta();
+  const { preferred, required } = gameOrientationPreference(meta);
+  const phone = isLikelyPhone();
+  const landscape = window.matchMedia && window.matchMedia('(orientation: landscape)').matches;
+  document.body.classList.toggle('is-phone', phone);
+  document.body.classList.toggle('is-landscape', !!landscape);
+  document.body.classList.toggle('is-portrait', !landscape);
+  document.body.classList.toggle('needs-landscape', !!(phone && required === 'landscape' && activeSection !== 'home'));
+  document.body.classList.toggle('needs-portrait', !!(phone && preferred === 'portrait' && !required && activeSection !== 'home'));
+}
+
 // ---- browser session persistence
 function loadSession() { try { return JSON.parse(localStorage.getItem('turnBasedGames')); } catch { return null; } }
 function setSession(s) { session = s; localStorage.setItem('turnBasedGames', JSON.stringify(s)); }
@@ -18,6 +42,7 @@ function clearSession() {
 }
 
 function show(id) {
+  applyDeviceClasses(id);
   ['home','lobby','placement','battle','connectFour','oneCard'].forEach(section => {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
@@ -54,6 +79,7 @@ function applyLaunchGame(gameId) {
   const select = $('gameSelect');
   if (!select || !gameId || !gameMeta(gameId)) return;
   select.value = gameId;
+  applyDeviceClasses('home');
 }
 function clearLaunchParams() {
   if (!window.history || !window.history.replaceState) return;
@@ -595,6 +621,9 @@ async function drawOneCard() {
 // ---------------- boot ----------------
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+$('gameSelect').addEventListener('change', () => applyDeviceClasses('home'));
+window.addEventListener('resize', () => applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home'));
+window.addEventListener('orientationchange', () => setTimeout(() => applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home'), 80));
 document.addEventListener('keydown', e => {
   if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
   if (!session) return;
