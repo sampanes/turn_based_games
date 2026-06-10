@@ -7,6 +7,10 @@ let fleetDef = [];             // from server view
 let pollTimer = null;
 let lastView = null;
 let boardSize = 10;
+let lastBattleEventKey = null;
+let lastBattleTurn = null;
+let placementDrag = null;
+let ignoreNextPlacementClick = false;
 
 // ---- mobile / orientation ergonomics
 function isLikelyPhone() {
@@ -223,6 +227,8 @@ function resetGameUi() {
   $('connectBoard').innerHTML = '';
   $('oneCardOpponents').innerHTML = '';
   $('oneCardHand').innerHTML = '';
+  lastBattleEventKey = null;
+  lastBattleTurn = null;
 }
 
 // ---------------- placement ----------------
@@ -245,10 +251,15 @@ function initPlacement() {
   for (let r = 0; r < boardSize; r++) for (let c = 0; c < boardSize; c++) {
     const cell = document.createElement('div');
     cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
-    cell.onclick = () => placeAt(r, c);
+    cell.onclick = () => {
+      if (ignoreNextPlacementClick) { ignoreNextPlacementClick = false; return; }
+      placeAt(r, c);
+    };
+    cell.onpointerdown = event => startPlacementDrag(event, r, c);
+    cell.onpointerenter = event => dragPreviewPlacement(event, r, c);
+    cell.onpointerup = event => finishPlacementDrag(event, r, c);
     cell.onmouseenter = () => previewPlacement(r, c);
-    cell.onmouseleave = () => renderPlaceGrid();
-    cell.ontouchstart = () => previewPlacement(r, c);
+    cell.onmouseleave = () => { if (!placementDrag) renderPlaceGrid(); };
     g.appendChild(cell);
   }
   // default selection = first ship
@@ -269,7 +280,7 @@ function renderFleetList() {
         ${placed ? '<span class="check">ok</span>' : `<span style="color:var(--mute);font-size:12px">${s.size}</span>`}
       </span>`;
     row.onclick = () => {
-      if (placed) { placedShips = placedShips.filter(p => p.name !== s.name); }
+      if (placed) { removePlacedShip(placed); return; }
       selectedShip = i; renderFleetList(); renderPlaceGrid();
     };
     list.appendChild(row);
@@ -285,6 +296,8 @@ function shipCells(r, c, size) {
 function occupiedSet() { const s = new Set(); placedShips.forEach(p => p.cells.forEach(x => s.add(x))); return s; }
 
 function placeAt(r, c) {
+  const existing = placedShipAt(`${r},${c}`);
+  if (existing) { removePlacedShip(existing); return; }
   if (selectedShip == null) return;
   const def = fleetDef[selectedShip];
   if (placedShips.find(p => p.name === def.name)) return; // already placed; tap list to pull back
@@ -295,11 +308,28 @@ function placeAt(r, c) {
     if (rr < 0 || rr >= boardSize || cc < 0 || cc >= boardSize) { toast('Off the board.'); return; }
     if (occ.has(cell)) { toast('Ships cannot overlap.'); return; }
   }
-  placedShips.push({ name: def.name, size: def.size, cells });
+  placedShips.push({ name: def.name, size: def.size, cells, orient });
   // advance to next unplaced
   const nextIdx = fleetDef.findIndex(s => !placedShips.find(p => p.name === s.name));
   selectedShip = nextIdx === -1 ? null : nextIdx;
   renderFleetList(); renderPlaceGrid();
+}
+
+function placedShipAt(key) {
+  return placedShips.find(ship => ship.cells.includes(key));
+}
+
+function removePlacedShip(ship) {
+  if (!ship) return false;
+  const idx = fleetDef.findIndex(s => s.name === ship.name);
+  placedShips = placedShips.filter(p => p.name !== ship.name);
+  selectedShip = idx === -1 ? selectedShip : idx;
+  if (ship.orient) {
+    orient = ship.orient;
+    $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
+  }
+  renderFleetList(); renderPlaceGrid();
+  return true;
 }
 
 function renderPlaceGrid(preview = []) {
@@ -309,9 +339,23 @@ function renderPlaceGrid(preview = []) {
   document.querySelectorAll('#placeGrid .cell').forEach(cell => {
     const key = `${cell.dataset.r},${cell.dataset.c}`;
     let cls = 'cell';
+    const ship = placedShipAt(key);
     if (occ.has(key)) cls += ' ship';
+    if (ship && ship.cells[0] === key) cls += ' ship-bow';
     if (previewSet.has(key)) cls += blocked ? ' blocked' : ' preview';
     cell.className = cls;
+    cell.textContent = ship && ship.cells[0] === key ? ship.name[0] : '';
+    cell.title = ship ? `${ship.name} - tap or drag to move` : '';
+  });
+}
+
+function placementPreviewCells(r, c) {
+  if (selectedShip == null || !fleetDef[selectedShip]) return [];
+  const def = fleetDef[selectedShip];
+  const occ = occupiedSet();
+  return shipCells(r, c, def.size).map(key => {
+    const [rr, cc] = key.split(',').map(Number);
+    return { key, blocked: rr < 0 || rr >= boardSize || cc < 0 || cc >= boardSize || occ.has(key) };
   });
 }
 
@@ -319,17 +363,44 @@ function previewPlacement(r, c) {
   if (selectedShip == null || !fleetDef[selectedShip]) return;
   const def = fleetDef[selectedShip];
   if (placedShips.find(p => p.name === def.name)) return;
-  const occ = occupiedSet();
-  const preview = shipCells(r, c, def.size).map(key => {
-    const [rr, cc] = key.split(',').map(Number);
-    return { key, blocked: rr < 0 || rr >= boardSize || cc < 0 || cc >= boardSize || occ.has(key) };
-  });
+  const preview = placementPreviewCells(r, c);
   renderPlaceGrid(preview);
+}
+
+function startPlacementDrag(event, r, c) {
+  const key = `${r},${c}`;
+  const ship = placedShipAt(key);
+  if (ship) {
+    removePlacedShip(ship);
+    placementDrag = { active: true, moved: false };
+    previewPlacement(r, c);
+    event.preventDefault();
+    return;
+  }
+  if (selectedShip == null || !fleetDef[selectedShip]) return;
+  placementDrag = { active: true, moved: false };
+  previewPlacement(r, c);
+  event.preventDefault();
+}
+
+function dragPreviewPlacement(event, r, c) {
+  if (!placementDrag || !placementDrag.active || !(event.buttons & 1)) return;
+  placementDrag.moved = true;
+  previewPlacement(r, c);
+}
+
+function finishPlacementDrag(event, r, c) {
+  if (!placementDrag || !placementDrag.active) return;
+  placementDrag = null;
+  ignoreNextPlacementClick = true;
+  placeAt(r, c);
+  event.preventDefault();
 }
 
 function toggleOrient() {
   orient = orient === 'H' ? 'V' : 'H';
   $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
+  renderPlaceGrid();
 }
 
 function randomize() {
@@ -346,7 +417,7 @@ function randomize() {
         const [rr, cc] = cell.split(',').map(Number);
         return rr >= 0 && rr < boardSize && cc >= 0 && cc < boardSize && !occ.has(cell);
       });
-      if (ok) placedShips.push({ name: def.name, size: def.size, cells });
+      if (ok) placedShips.push({ name: def.name, size: def.size, cells, orient: o });
     }
   }
   selectedShip = null; renderFleetList(); renderPlaceGrid();
@@ -377,19 +448,37 @@ function renderBattle(d, v) {
   buildGrid($('fireGrid'), true);
   buildGrid($('myGrid'), false);
 
+  const shot = v.lastShot;
+  const shotKey = shot ? `${shot.by}:${shot.r},${shot.c}:${shot.result}:${shot.sunk || ''}` : null;
+  const newShot = !!shotKey && shotKey !== lastBattleEventKey;
+  const turnChanged = v.turn !== lastBattleTurn;
+  const yourTurn = v.phase === 'battle' && v.turn === d.you;
+  $('battle').classList.toggle('your-turn', yourTurn);
+  $('fireGrid').classList.toggle('ready-to-fire', yourTurn);
+
   // firing grid = my shots on enemy
   document.querySelectorAll('#fireGrid .cell').forEach(cell => {
-    const val = v.firingBoard[+cell.dataset.r][+cell.dataset.c];
-    cell.className = 'cell' + (val === 'hit' ? ' hit' : val === 'miss' ? ' miss' : '');
+    const r = +cell.dataset.r;
+    const c = +cell.dataset.c;
+    const val = v.firingBoard[r][c];
+    let cls = 'cell' + (val === 'hit' ? ' hit scored-hit' : val === 'miss' ? ' miss' : '');
+    if (shot && shot.by === d.you && shot.r === r && shot.c === c) cls += ' last-shot outgoing-shot';
+    cell.className = cls;
+    cell.setAttribute('aria-label', val ? `Your ${val} at ${coordLabel(r, c)}` : `Fire at ${coordLabel(r, c)}`);
   });
   // my fleet grid, with enemy shots shown
   document.querySelectorAll('#myGrid .cell').forEach(cell => {
-    const sq = v.myBoard[+cell.dataset.r][+cell.dataset.c];
+    const r = +cell.dataset.r;
+    const c = +cell.dataset.c;
+    const sq = v.myBoard[r][c];
     let cls = 'cell';
-    if (sq.shot === 'hit') cls += ' hit';
+    if (sq.shot === 'hit') cls += ' hit incoming-hit';
     else if (sq.shot === 'miss') cls += ' miss';
     else if (sq.ship) cls += ' ship';
+    if (shot && shot.by !== d.you && shot.r === r && shot.c === c) cls += ' last-shot incoming-shot';
     cell.className = cls;
+    const shipText = sq.ship ? 'ship' : 'water';
+    cell.setAttribute('aria-label', sq.shot ? `Opponent ${sq.shot} on your ${shipText} at ${coordLabel(r, c)}` : `Your ${shipText} at ${coordLabel(r, c)}`);
   });
 
   $('enemyLeft').textContent = `${v.enemyShipsLeft} ship${v.enemyShipsLeft === 1 ? '' : 's'} afloat`;
@@ -400,22 +489,41 @@ function renderBattle(d, v) {
     const won = v.winner === d.you;
     banner.className = 'status ' + (won ? 'win' : 'lose');
     banner.textContent = won ? 'VICTORY - enemy fleet destroyed' : 'DEFEAT - your fleet is sunk';
-  } else if (v.turn === d.you) {
+  } else if (yourTurn) {
     banner.className = 'status you';
-    banner.textContent = sunkNote(v, d) || 'YOUR MOVE - tap enemy waters to fire';
+    banner.textContent = battleStatusText(v, d) || 'YOUR TURN - tap enemy waters to fire';
   } else {
     banner.className = 'status them';
-    banner.textContent = sunkNote(v, d) || `Standing by - ${d.opponentName || 'opponent'} is taking aim...`;
+    banner.textContent = battleStatusText(v, d) || `OPPONENT TURN - ${d.opponentName || 'opponent'} is taking aim...`;
   }
+
+  if (newShot || turnChanged) {
+    banner.classList.remove('activity');
+    void banner.offsetWidth;
+    banner.classList.add('activity');
+  }
+  if (newShot && shot) {
+    const grid = shot.by === d.you ? $('fireGrid') : $('myGrid');
+    grid.classList.remove(shot.result === 'hit' ? 'hit-flash' : 'miss-flash');
+    void grid.offsetWidth;
+    grid.classList.add(shot.result === 'hit' ? 'hit-flash' : 'miss-flash');
+  }
+  lastBattleEventKey = shotKey;
+  lastBattleTurn = v.turn;
 }
 
-function sunkNote(v, d) {
+function coordLabel(r, c) {
+  return `${String.fromCharCode(65 + r)}${c + 1}`;
+}
+
+function battleStatusText(v, d) {
   const ls = v.lastShot;
   if (!ls) return null;
-  if (ls.sunk) {
-    return ls.by === d.you ? `You sank their ${ls.sunk}!` : `They sank your ${ls.sunk}.`;
-  }
-  return null;
+  const actor = ls.by === d.you ? 'You' : (d.opponentName || 'Opponent');
+  const target = ls.by === d.you ? 'enemy waters' : 'your fleet';
+  const result = ls.result === 'hit' ? 'HIT' : 'MISS';
+  const sunk = ls.sunk ? ` and sank ${ls.by === d.you ? 'their' : 'your'} ${ls.sunk}` : '';
+  return `${actor} fired at ${coordLabel(ls.r, ls.c)} in ${target}: ${result}${sunk}. ${v.turn === d.you ? 'YOUR TURN.' : 'OPPONENT TURN.'}`;
 }
 
 async function fire(r, c) {
