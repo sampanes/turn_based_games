@@ -11,6 +11,7 @@ let lastBattleEventKey = null;
 let lastBattleTurn = null;
 let placementDrag = null;
 let ignoreNextPlacementClick = false;
+let oneCardHandUi = { selectedIndex: 0, selectedCardId: null, raised: false, gesture: null };
 
 // ---- mobile / orientation ergonomics
 function isLikelyPhone() {
@@ -226,6 +227,7 @@ function resetGameUi() {
   $('connectColumns').innerHTML = '';
   $('connectBoard').innerHTML = '';
   $('oneCardOpponents').innerHTML = '';
+  resetOneCardHandUi();
   $('oneCardHand').innerHTML = '';
   lastBattleEventKey = null;
   lastBattleTurn = null;
@@ -623,6 +625,128 @@ function oneCardName(card) {
 function oneCardCanPlay(v, card) {
   return v.phase === 'battle' && v.turn === session.you && v.legalCardIds.includes(card.id);
 }
+function resetOneCardHandUi() {
+  oneCardHandUi = { selectedIndex: 0, selectedCardId: null, raised: false, gesture: null };
+}
+function clampOneCardIndex(index, hand) {
+  if (!hand.length) return 0;
+  return Math.max(0, Math.min(hand.length - 1, index));
+}
+function syncOneCardSelection(hand) {
+  if (!hand.length) {
+    oneCardHandUi.selectedIndex = 0;
+    oneCardHandUi.selectedCardId = null;
+    oneCardHandUi.raised = false;
+    return;
+  }
+  const existing = hand.findIndex(card => card.id === oneCardHandUi.selectedCardId);
+  oneCardHandUi.selectedIndex = existing >= 0
+    ? existing
+    : clampOneCardIndex(oneCardHandUi.selectedIndex || Math.floor((hand.length - 1) / 2), hand);
+  oneCardHandUi.selectedCardId = hand[oneCardHandUi.selectedIndex].id;
+}
+function setOneCardSelection(hand, index, raised = true) {
+  oneCardHandUi.selectedIndex = clampOneCardIndex(index, hand);
+  oneCardHandUi.selectedCardId = hand[oneCardHandUi.selectedIndex] ? hand[oneCardHandUi.selectedIndex].id : null;
+  oneCardHandUi.raised = !!(raised && hand.length);
+  layoutOneCardFan(hand);
+}
+function oneCardFanMetrics(hand) {
+  const n = Math.max(1, hand.length);
+  const handEl = $('oneCardHand');
+  const width = Math.max(280, (handEl && handEl.clientWidth) || window.innerWidth || 360);
+  const cardWidth = Math.max(54, Math.min(92, 92 - Math.max(0, n - 7) * 4));
+  const usable = Math.max(0, width - cardWidth - 20);
+  const step = n <= 1 ? 0 : Math.min(cardWidth * 0.64, usable / (n - 1));
+  return { n, cardWidth, step };
+}
+function layoutOneCardFan(hand) {
+  const handEl = $('oneCardHand');
+  if (!handEl) return;
+  syncOneCardSelection(hand);
+  const { n, cardWidth, step } = oneCardFanMetrics(hand);
+  const selected = oneCardHandUi.selectedIndex;
+  handEl.style.setProperty('--hand-card-w', `${cardWidth}px`);
+  handEl.style.setProperty('--hand-count', String(n));
+  handEl.style.setProperty('--selected-index', String(selected));
+  handEl.classList.toggle('raised', oneCardHandUi.raised);
+  handEl.querySelectorAll('.one-card-card').forEach((cardEl, i) => {
+    const offset = i - (n - 1) / 2;
+    const fromSelected = i - selected;
+    const absSelected = Math.abs(fromSelected);
+    const selectedLift = oneCardHandUi.raised && i === selected ? -72 : 0;
+    const neighborLift = oneCardHandUi.raised && absSelected === 1 ? -18 : 0;
+    cardEl.style.setProperty('--fan-x', `${offset * step}px`);
+    cardEl.style.setProperty('--fan-y', `${Math.abs(offset) * 4 + selectedLift + neighborLift}px`);
+    cardEl.style.setProperty('--fan-rot', `${offset * Math.max(3.3, 7 - n * 0.18)}deg`);
+    cardEl.style.setProperty('--fan-scale', oneCardHandUi.raised && i === selected ? '1.08' : '1');
+    cardEl.style.setProperty('--fan-z', String(50 + (oneCardHandUi.raised ? 30 - absSelected : i) + (i === selected ? 100 : 0)));
+    cardEl.classList.toggle('selected', i === selected);
+    cardEl.classList.toggle('peek-left', oneCardHandUi.raised && fromSelected === -1);
+    cardEl.classList.toggle('peek-right', oneCardHandUi.raised && fromSelected === 1);
+  });
+}
+function startOneCardHandGesture(event, index) {
+  if (!lastView || lastView.ui !== 'onecard' || !(lastView.hand || []).length) return;
+  const hand = lastView.hand;
+  const targetIndex = Number.isFinite(index) ? index : oneCardHandUi.selectedIndex;
+  setOneCardSelection(hand, targetIndex, true);
+  oneCardHandUi.gesture = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    lastX: event.clientX,
+    lastY: event.clientY,
+    lastT: performance.now(),
+    moved: false,
+  };
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+  event.preventDefault();
+}
+function moveOneCardHandGesture(event) {
+  const gesture = oneCardHandUi.gesture;
+  if (!gesture || gesture.pointerId !== event.pointerId || !lastView) return;
+  const hand = lastView.hand || [];
+  const { step } = oneCardFanMetrics(hand);
+  const dx = event.clientX - gesture.startX;
+  const dy = event.clientY - gesture.startY;
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) gesture.moved = true;
+  if (gesture.startIndex == null) gesture.startIndex = oneCardHandUi.selectedIndex;
+  const deltaCards = Math.round(dx / Math.max(28, step * 0.72));
+  const nextIndex = clampOneCardIndex(gesture.startIndex + deltaCards, hand);
+  if (nextIndex !== oneCardHandUi.selectedIndex) setOneCardSelection(hand, nextIndex, true);
+  gesture.lastX = event.clientX;
+  gesture.lastY = event.clientY;
+  gesture.lastT = performance.now();
+  event.preventDefault();
+}
+function finishOneCardHandGesture(event) {
+  const gesture = oneCardHandUi.gesture;
+  if (!gesture || gesture.pointerId !== event.pointerId || !lastView) return;
+  const hand = lastView.hand || [];
+  const dx = event.clientX - gesture.startX;
+  const dy = event.clientY - gesture.startY;
+  const elapsed = Math.max(1, performance.now() - gesture.lastT);
+  const vy = (event.clientY - gesture.lastY) / elapsed;
+  const selected = hand[oneCardHandUi.selectedIndex];
+  oneCardHandUi.gesture = null;
+  if (dy < -86 || vy < -0.75) {
+    if (selected && oneCardCanPlay(lastView, selected)) {
+      oneCardHandUi.raised = false;
+      layoutOneCardFan(hand);
+      playOneCard(selected);
+    } else {
+      toast('That card is not legal right now.');
+      setOneCardSelection(hand, oneCardHandUi.selectedIndex, true);
+    }
+  } else if (dy > 64 || vy > 0.75) {
+    oneCardHandUi.raised = false;
+    layoutOneCardFan(hand);
+  } else {
+    setOneCardSelection(hand, oneCardHandUi.selectedIndex, true);
+  }
+  if (Math.abs(dx) > 8 || Math.abs(dy) > 8) event.preventDefault();
+}
 function renderOneCard(d, v) {
   const players = v.players || [];
   const me = players.find(player => player.you) || { name: d.youName, cards: (v.hand || []).length };
@@ -667,17 +791,35 @@ function renderOneCard(d, v) {
   });
 
   const hand = $('oneCardHand');
+  const cards = v.hand || [];
   hand.innerHTML = '';
-  (v.hand || []).forEach(card => {
+  syncOneCardSelection(cards);
+  cards.forEach((card, index) => {
     const btn = document.createElement('button');
-    btn.className = `one-card-card ${oneCardColor(card)}` + (oneCardCanPlay(v, card) ? ' playable' : '');
-    btn.disabled = !oneCardCanPlay(v, card);
+    const canPlay = oneCardCanPlay(v, card);
+    btn.className = `one-card-card ${oneCardColor(card)}` + (canPlay ? ' playable' : '');
+    btn.type = 'button';
+    btn.setAttribute('aria-disabled', canPlay ? 'false' : 'true');
+    btn.setAttribute('aria-label', `${oneCardName(card)}${canPlay ? ', playable' : ', not playable'}`);
     const label = oneCardLabel(card);
     const color = card.color === 'wild' ? 'Wild' : card.color;
     btn.innerHTML = `<b class="corner top">${label}</b><span>${label}</span><small>${color}</small><b class="corner bottom">${label}</b>`;
-    btn.onclick = () => playOneCard(card);
+    btn.onclick = event => {
+      if (oneCardHandUi.gesture && oneCardHandUi.gesture.moved) return;
+      if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+        event.preventDefault();
+        setOneCardSelection(cards, index, true);
+        return;
+      }
+      playOneCard(card);
+    };
+    btn.onpointerdown = event => startOneCardHandGesture(event, index);
+    btn.onpointermove = moveOneCardHandGesture;
+    btn.onpointerup = finishOneCardHandGesture;
+    btn.onpointercancel = finishOneCardHandGesture;
     hand.appendChild(btn);
   });
+  layoutOneCardFan(cards);
 
   const banner = $('oneCardStatus');
   if (v.phase === 'lobby') {
@@ -730,8 +872,14 @@ async function drawOneCard() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 $('gameSelect').addEventListener('change', () => applyDeviceClasses('home'));
-window.addEventListener('resize', () => applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home'));
-window.addEventListener('orientationchange', () => setTimeout(() => applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home'), 80));
+window.addEventListener('resize', () => {
+  applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home');
+  if (lastView && lastView.ui === 'onecard') layoutOneCardFan(lastView.hand || []);
+});
+window.addEventListener('orientationchange', () => setTimeout(() => {
+  applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home');
+  if (lastView && lastView.ui === 'onecard') layoutOneCardFan(lastView.hand || []);
+}, 80));
 document.addEventListener('keydown', e => {
   if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
   if (!session) return;

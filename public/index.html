@@ -200,6 +200,7 @@
 
   /* UNO */
   .one-card-panel { overflow: hidden; }
+  #oneCard .portrait-recommended { display: none !important; }
   .one-card-table { display: grid; gap: 14px; }
   .one-card-code { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px dashed rgba(255,179,71,.45); border-radius: 12px; color: var(--amber); background: rgba(255,179,71,.06); }
   .one-card-code strong { font-size: 24px; letter-spacing: 5px; }
@@ -223,8 +224,9 @@
   .one-card-card.green { background: linear-gradient(145deg, #4ee08f, #087341); }
   .one-card-card.blue { background: linear-gradient(145deg, #58b7ff, #1050b7); }
   .one-card-card.wild { background: conic-gradient(from 45deg, #ff5b51, #ffcf52, #34e78a, #58b7ff, #ff5b51); }
-  button.one-card-card { padding: 8px; transition: transform .12s ease, filter .12s ease; }
+  button.one-card-card { padding: 8px; transition: transform .12s ease, filter .12s ease, box-shadow .12s ease; }
   button.one-card-card.playable { transform: translateY(-8px); filter: saturate(1.2) brightness(1.08); border-color: #fff; animation: playablePulse 1.7s ease-in-out infinite; }
+  button.one-card-card[aria-disabled="true"] { cursor: pointer; opacity: .62; filter: grayscale(.18); }
   button.one-card-card:disabled { cursor: not-allowed; opacity: .52; filter: grayscale(.18); }
   @keyframes playablePulse { 0%, 100% { box-shadow: inset 0 0 0 5px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); } 50% { box-shadow: inset 0 0 0 5px rgba(255,255,255,.22), 0 0 26px rgba(255,255,255,.28); } }
   .one-card-deck { background: linear-gradient(145deg, #142d3a, #06141b); color: var(--sonar); }
@@ -235,6 +237,7 @@
   .color-dot.red { background: #ff5b51; color: #ff5b51; } .color-dot.gold { background: #ffcf52; color: #ffcf52; } .color-dot.green { background: #34e78a; color: #34e78a; } .color-dot.blue { background: #58b7ff; color: #58b7ff; }
   .one-card-hand { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 8px; }
   .one-card-hand .one-card-card { min-height: 126px; }
+  .one-card-hand.raised::before { content: "Swipe sideways to browse · flick up to play · flick down to tuck"; display: none; }
   .one-card-toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .one-card-last { min-height: 20px; text-align: center; color: var(--mute); font-size: 12px; }
   @media (min-width: 520px) { .one-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
@@ -265,10 +268,54 @@
   body.is-phone .drop-btn { font-size: 22px; padding-block: 10px; }
   body.is-phone .one-opponents { grid-template-columns: 1fr; }
   body.is-phone .one-opponent { min-height: 50px; flex-direction: row; align-items: center; }
+  body.is-phone .one-card-table { gap: 10px; }
   body.is-phone .one-card-center { padding: 10px; gap: 10px; }
   body.is-phone .one-card-toolbar { grid-template-columns: 1fr; }
-  body.is-phone .one-card-hand { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-  body.is-phone .one-card-hand .one-card-card { min-height: 136px; }
+  body.is-phone .one-card-hand {
+    --hand-card-w: 84px;
+    position: relative;
+    display: block;
+    height: clamp(190px, 33dvh, 250px);
+    margin: 6px -6px 0;
+    padding: 0;
+    overflow: visible;
+    touch-action: none;
+    user-select: none;
+  }
+  body.is-phone .one-card-hand::before {
+    content: "Thumb the middle card, slide to browse, flick up to play";
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 4px;
+    color: var(--mute);
+    font-size: 10px;
+    letter-spacing: .6px;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  body.is-phone .one-card-hand.raised::before { content: "Release to hold · swipe sides for next · flick down to tuck"; display: block; }
+  body.is-phone .one-card-hand .one-card-card {
+    position: absolute;
+    left: 50%;
+    bottom: 28px;
+    width: var(--hand-card-w);
+    min-width: 0;
+    min-height: 0;
+    height: calc(var(--hand-card-w) * 1.4);
+    padding: 6px;
+    transform-origin: 50% 112%;
+    transform: translateX(calc(-50% + var(--fan-x, 0px))) translateY(var(--fan-y, 0px)) rotate(var(--fan-rot, 0deg)) scale(var(--fan-scale, 1));
+    z-index: var(--fan-z, 1);
+    will-change: transform;
+    touch-action: none;
+  }
+  body.is-phone .one-card-hand .one-card-card.selected { border-color: rgba(255,255,255,.92); filter: saturate(1.2) brightness(1.06); }
+  body.is-phone .one-card-hand .one-card-card.peek-left,
+  body.is-phone .one-card-hand .one-card-card.peek-right { filter: brightness(1.05); }
+  body.is-phone .one-card-hand .one-card-card span { font-size: clamp(23px, 9vw, 38px); }
+  body.is-phone .one-card-hand .one-card-card small { font-size: 8px; }
+  body.is-phone .one-card-hand .one-card-card .corner { font-size: 9px; }
   body.is-phone .toast { width: min(92vw, 420px); text-align: center; bottom: calc(env(safe-area-inset-bottom) + 18px); }
   body.is-phone.needs-landscape .orientation-note.landscape-required,
   body.is-phone.needs-portrait .orientation-note.portrait-recommended { display: block; }
@@ -293,7 +340,8 @@
   @media (max-width: 380px) {
     body.is-phone .card { padding: 10px; }
     body.is-phone .grid { --grid-gap: 1px; }
-    body.is-phone .one-card-hand .one-card-card { min-height: 124px; }
+    body.is-phone .one-card-hand { height: 190px; }
+    body.is-phone .one-card-hand .one-card-card { height: calc(var(--hand-card-w) * 1.4); }
   }
   @media (orientation: landscape) and (max-height: 520px) {
     body.is-phone header { display: none; }
