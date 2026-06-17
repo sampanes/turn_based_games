@@ -203,6 +203,16 @@ const server = http.createServer((req, res) => {
   }
 });
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use - a forgotten Turn-Based Games`);
+    console.error(`instance (or something else) is holding it. Run stop-server.bat,`);
+    console.error(`or find it with ..\\find-js-processes.bat, then start again.`);
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(PORT, HOST, () => {
   const address = server.address();
   const actualPort = address && typeof address === 'object' ? address.port : PORT;
