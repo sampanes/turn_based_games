@@ -198,6 +198,58 @@
   .disc-dot.A { background: #ffcf52; box-shadow: 0 0 10px rgba(255,179,71,.6); }
   .disc-dot.B { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.6); }
 
+  /* Ultimate TTT */
+  .uttt-panel { overflow: hidden; }
+  .uttt-stage {
+    margin-top: 14px; padding: 8px;
+    border: 1px solid rgba(52,231,196,.22); border-radius: 18px;
+    background: linear-gradient(180deg, #082838, #041018);
+    box-shadow: inset 0 0 30px rgba(52,231,196,.08), 0 18px 40px rgba(0,0,0,.35);
+  }
+  .uttt-board {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px;
+    aspect-ratio: 1; width: min(100%, 460px); max-width: 460px;
+    margin: 0 auto; padding: 7px;
+    background: var(--line); border-radius: 12px;
+  }
+  .uttt-mini {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+    position: relative; border-radius: 6px; overflow: hidden;
+    background: rgba(10,31,43,.5); padding: 3px;
+    transition: box-shadow .18s ease;
+  }
+  .uttt-mini.active { box-shadow: 0 0 0 2px var(--sonar), 0 0 16px rgba(52,231,196,.32); }
+  .uttt-mini.free  { box-shadow: 0 0 0 1px rgba(52,231,196,.38); }
+  .uttt-cell {
+    aspect-ratio: 1; background: var(--deep); border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(14px, 5.5vw, 22px); font-weight: 900; line-height: 1;
+    cursor: default; user-select: none; touch-action: manipulation;
+    transition: background .08s ease, transform .06s ease;
+  }
+  .uttt-cell.X { color: var(--amber); background: rgba(255,179,71,.2); }
+  .uttt-cell.O { color: var(--sonar); background: rgba(52,231,196,.2); }
+  .uttt-cell.valid { cursor: pointer; background: rgba(52,231,196,.07); }
+  .uttt-cell.valid:hover { background: rgba(52,231,196,.2); }
+  .uttt-cell.valid:active { background: rgba(52,231,196,.3); transform: scale(.93); }
+  .uttt-cell.last { outline: 2px solid rgba(255,255,255,.5); outline-offset: -3px; }
+  .uttt-mini-winner {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(30px, 11vw, 54px); font-weight: 900; letter-spacing: -1px;
+    pointer-events: none; border-radius: 4px;
+  }
+  .uttt-mini.won-X .uttt-mini-winner { color: var(--amber); background: rgba(8,18,24,.84); border: 2px solid rgba(255,179,71,.5); text-shadow: 0 0 22px rgba(255,179,71,.85); }
+  .uttt-mini.won-O .uttt-mini-winner { color: var(--sonar); background: rgba(8,18,24,.84); border: 2px solid rgba(52,231,196,.5); text-shadow: 0 0 22px rgba(52,231,196,.85); }
+  .uttt-mini.won-draw .uttt-mini-winner { color: var(--mute); background: rgba(8,18,24,.84); font-size: clamp(14px, 4.5vw, 26px); letter-spacing: 2px; }
+  .uttt-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--mute); font-size: 12px; }
+  .uttt-piece { font-weight: 900; margin-right: 4px; }
+  .uttt-piece.X { color: var(--amber); }
+  .uttt-piece.O { color: var(--sonar); }
+  body.is-phone .uttt-board { gap: 5px; padding: 5px; }
+  body.is-phone .uttt-mini { gap: 2px; padding: 2px; }
+  @media (min-width: 720px) { .uttt-panel { max-width: 620px; margin-left: auto; margin-right: auto; } }
+
   /* UNO */
   .one-card-panel { overflow: hidden; }
   #oneCard .portrait-recommended { display: none !important; }
@@ -478,6 +530,16 @@
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
+  <!-- ULTIMATE TTT -->
+  <section id="ultimateTTT" class="card uttt-panel hidden">
+    <div id="utttStatus" class="status">...</div>
+    <div class="uttt-stage">
+      <div id="utttBoard" class="uttt-board"></div>
+    </div>
+    <div class="uttt-legend" id="utttLegend"></div>
+    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+  </section>
+
   <div class="footnote" id="foot"></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -486,6 +548,7 @@
 <script src="games/battleship.js"></script>
 <script src="games/connectfour.js"></script>
 <script src="games/onecard.js"></script>
+<script src="games/ultimatettt.js"></script>
 <script src="solo.js"></script>
 <script src="app.js"></script>
 

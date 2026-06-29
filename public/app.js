@@ -48,7 +48,7 @@ function clearSession() {
 
 function show(id) {
   applyDeviceClasses(id);
-  ['home','lobby','placement','battle','connectFour','oneCard'].forEach(section => {
+  ['home','lobby','placement','battle','connectFour','oneCard','ultimateTTT'].forEach(section => {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
   });
@@ -192,6 +192,11 @@ function render(d) {
   if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; return; }
 
   const meta = currentGameMeta();
+  if ((v.ui || (meta && meta.ui)) === 'ultimatettt') {
+    show('ultimateTTT');
+    renderUltimateTTT(d, v);
+    return;
+  }
   if ((v.ui || (meta && meta.ui)) === 'connectfour') {
     show('connectFour');
     renderConnectFour(d, v);
@@ -226,6 +231,7 @@ function resetGameUi() {
   $('myGrid').innerHTML = '';
   $('connectColumns').innerHTML = '';
   $('connectBoard').innerHTML = '';
+  if ($('utttBoard')) $('utttBoard').innerHTML = '';
   $('oneCardOpponents').innerHTML = '';
   resetOneCardHandUi();
   $('oneCardHand').innerHTML = '';
@@ -864,6 +870,88 @@ async function drawOneCard() {
   if (!lastView || lastView.ui !== 'onecard' || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
   try {
     await api('/api/move', 'POST', { room: session.room, token: session.token, move: { action: 'draw' } });
+    poll();
+  } catch (e) { toast(e.message); }
+}
+
+// ---------------- Ultimate TTT ----------------
+function renderUltimateTTT(d, v) {
+  const EMPTY = 0, X = 1, O = 2, DRAW = 3;
+  const board = $('utttBoard');
+  const validSet = new Set(v.validMoves || []);
+
+  board.innerHTML = '';
+  for (let mini = 0; mini < 9; mini++) {
+    const miniWinner = v.miniWinners[mini];
+    const baseRow = Math.floor(mini / 3) * 3;
+    const baseCol = (mini % 3) * 3;
+
+    const isFreeChoice = v.isMyTurn && v.activeMini === -1;
+    const isActive = v.isMyTurn && (isFreeChoice ? miniWinner === EMPTY : v.activeMini === mini);
+
+    const miniEl = document.createElement('div');
+    miniEl.className = 'uttt-mini'
+      + (miniWinner === X ? ' won-X' : miniWinner === O ? ' won-O' : miniWinner === DRAW ? ' won-draw' : '')
+      + (isActive && !isFreeChoice ? ' active' : '')
+      + (isActive && isFreeChoice && miniWinner === EMPTY ? ' free' : '');
+
+    for (let lr = 0; lr < 3; lr++) {
+      for (let lc = 0; lc < 3; lc++) {
+        const idx = (baseRow + lr) * 9 + (baseCol + lc);
+        const val = v.board[idx];
+        const isValid = validSet.has(idx);
+        const isLast = v.lastMove === idx;
+
+        const cell = document.createElement('div');
+        cell.className = 'uttt-cell'
+          + (val === X ? ' X' : val === O ? ' O' : '')
+          + (isValid ? ' valid' : '')
+          + (isLast ? ' last' : '');
+        if (val === X) cell.textContent = 'X';
+        else if (val === O) cell.textContent = 'O';
+        if (isValid) cell.onclick = () => moveUltimateTTT(idx);
+        miniEl.appendChild(cell);
+      }
+    }
+
+    if (miniWinner !== EMPTY) {
+      const ov = document.createElement('div');
+      ov.className = 'uttt-mini-winner';
+      ov.textContent = miniWinner === X ? 'X' : miniWinner === O ? 'O' : '—';
+      miniEl.appendChild(ov);
+    }
+
+    board.appendChild(miniEl);
+  }
+
+  const banner = $('utttStatus');
+  if (v.phase === 'over') {
+    const tied = v.winner === 'draw';
+    const won = v.winner === d.you;
+    banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    banner.textContent = tied ? 'DRAW - all boards claimed' : won ? 'VICTORY - three boards in a row' : 'DEFEAT - opponent claimed three boards in a row';
+  } else if (v.isMyTurn) {
+    const where = v.activeMini === -1 ? 'any open board' : `board ${v.activeMini + 1}`;
+    banner.className = 'status you';
+    banner.textContent = `YOUR MOVE - play in ${where}`;
+  } else {
+    banner.className = 'status them';
+    banner.textContent = `OPPONENT TURN - ${d.opponentName || 'opponent'} is thinking...`;
+  }
+
+  const legend = $('utttLegend');
+  if (legend) {
+    const youPiece = v.myPiece;
+    const oppPiece = youPiece === 'X' ? 'O' : 'X';
+    legend.innerHTML = `<span><span class="uttt-piece ${youPiece}">${youPiece}</span>You</span>`
+      + `<span>Opponent<span class="uttt-piece ${oppPiece}" style="margin-left:4px">${oppPiece}</span></span>`;
+  }
+}
+
+async function moveUltimateTTT(idx) {
+  if (!lastView || lastView.phase !== 'battle' || !lastView.isMyTurn) { toast('Not your turn.'); return; }
+  try {
+    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { idx } });
     poll();
   } catch (e) { toast(e.message); }
 }
