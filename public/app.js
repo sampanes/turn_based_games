@@ -48,7 +48,7 @@ function clearSession() {
 
 function show(id) {
   applyDeviceClasses(id);
-  ['home','lobby','placement','battle','connectFour','oneCard','ultimateTTT'].forEach(section => {
+  ['home','lobby','placement','battle','connectFour','oneCard','mancala','ultimateTTT'].forEach(section => {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
   });
@@ -192,6 +192,11 @@ function render(d) {
   if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; return; }
 
   const meta = currentGameMeta();
+  if ((v.ui || (meta && meta.ui)) === 'mancala') {
+    show('mancala');
+    renderMancala(d, v);
+    return;
+  }
   if ((v.ui || (meta && meta.ui)) === 'ultimatettt') {
     show('ultimateTTT');
     renderUltimateTTT(d, v);
@@ -231,6 +236,7 @@ function resetGameUi() {
   $('myGrid').innerHTML = '';
   $('connectColumns').innerHTML = '';
   $('connectBoard').innerHTML = '';
+  if ($('mncBoard')) { $('mncBoard').innerHTML = ''; mncLastPits = null; mncLastMoveTag = null; mncAnimating = false; }
   if ($('utttBoard')) $('utttBoard').innerHTML = '';
   $('oneCardOpponents').innerHTML = '';
   resetOneCardHandUi();
@@ -870,6 +876,246 @@ async function drawOneCard() {
   if (!lastView || lastView.ui !== 'onecard' || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
   try {
     await api('/api/move', 'POST', { room: session.room, token: session.token, move: { action: 'draw' } });
+    poll();
+  } catch (e) { toast(e.message); }
+}
+
+// ---------------- Mancala ----------------
+let mncAnimating = false;
+let mncLastPits = null;
+let mncLastMoveTag = null;
+
+function mncDotsHTML(count) {
+  if (!count || count > 5) return '';
+  // Dice-face positions in a 100×100 viewBox
+  const faces = {
+    1: [[50,50]],
+    2: [[30,50],[70,50]],
+    3: [[26,32],[50,62],[74,32]],
+    4: [[28,28],[72,28],[28,72],[72,72]],
+    5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
+  };
+  const R = 9;
+  const circles = faces[count].map(([x,y]) => `<circle cx="${x}" cy="${y}" r="${R}"/>`).join('');
+  return `<svg class="mnc-dots-svg" viewBox="0 0 100 100" aria-hidden="true">${circles}</svg>`;
+}
+
+function buildMancalaBoard(v, pits) {
+  const mkStore = (pitIdx, who) => {
+    const count = pits[pitIdx];
+    return `<div class="mnc-store ${who}" id="mnc-p${pitIdx}" data-pit="${pitIdx}"
+      style="grid-column:${who === 'opp' ? 1 : 3};grid-row:1/3">
+      <div class="mnc-scount">${count}</div>
+      <div class="mnc-slabel">${who === 'mine' ? 'You' : 'Opp'}</div>
+    </div>`;
+  };
+
+  const mkPit = (pitIdx, who) => {
+    const count = pits[pitIdx];
+    const empty = count === 0;
+    const valid = who === 'mine' && !mncAnimating && v.isMyTurn && v.validMoves.includes(pitIdx);
+    const many = count > 5;
+    const cls = `mnc-pit ${who}${empty ? ' empty' : ''}${valid ? ' valid' : ''}${many ? ' many' : ''}`;
+    const tap = valid ? `onclick="moveMancala(${pitIdx})"` : '';
+    return `<div class="${cls}" id="mnc-p${pitIdx}" data-pit="${pitIdx}" ${tap}>
+      ${mncDotsHTML(count)}
+      <span class="mnc-count">${count || ''}</span>
+    </div>`;
+  };
+
+  return `
+    ${mkStore(v.oppStoreIndex, 'opp')}
+    <div class="mnc-row opp" style="grid-column:2;grid-row:1">
+      ${v.oppPitIndices.map(i => mkPit(i, 'opp')).join('')}
+    </div>
+    <div class="mnc-row mine" style="grid-column:2;grid-row:2">
+      ${v.myPitIndices.map(i => mkPit(i, 'mine')).join('')}
+    </div>
+    ${mkStore(v.myStoreIndex, 'mine')}
+  `;
+}
+
+function mncUpdatePit(pitIdx, count, v) {
+  const el = document.getElementById(`mnc-p${pitIdx}`);
+  if (!el) return;
+  const isStore = el.classList.contains('mnc-store');
+  const countEl = el.querySelector(isStore ? '.mnc-scount' : '.mnc-count');
+  if (countEl) countEl.textContent = count || (isStore ? count : '');
+  if (!isStore) {
+    el.classList.toggle('empty', count === 0);
+    el.classList.toggle('many', count > 5);
+    const dotsEl = el.querySelector('.mnc-dots-svg');
+    if (dotsEl) el.removeChild(dotsEl);
+    if (count > 0 && count <= 5) el.insertAdjacentHTML('afterbegin', mncDotsHTML(count));
+  }
+}
+
+function mncBounce(pitIdx) {
+  const el = document.getElementById(`mnc-p${pitIdx}`);
+  if (!el) return;
+  el.classList.remove('land');
+  void el.offsetWidth;
+  el.classList.add('land');
+  setTimeout(() => el.classList.remove('land'), 280);
+}
+
+function mncAnimateMove(v, prevPits) {
+  mncAnimating = true;
+  const { moveSeq, movePickup, pits, extraTurn, captureCount, captureFrom, myStoreIndex } = v;
+
+  const running = prevPits.slice();
+  const frames = [];
+
+  // Pickup: source pit goes to 0
+  running[movePickup] = 0;
+  frames.push({ pit: movePickup, count: 0, type: 'pickup' });
+
+  // Sow: each stone drops into its pit
+  for (const pitIdx of moveSeq) {
+    running[pitIdx]++;
+    frames.push({ pit: pitIdx, count: running[pitIdx], type: 'sow' });
+  }
+
+  // Capture: opponent pit clears, my store gains
+  if (captureCount > 0 && captureFrom >= 0) {
+    frames.push({ pit: captureFrom, count: 0, type: 'capture-clear' });
+    frames.push({ pit: myStoreIndex, count: pits[myStoreIndex], type: 'capture-store' });
+  }
+
+  // Extra turn: store pulse
+  if (extraTurn) {
+    frames.push({ pit: myStoreIndex, count: pits[myStoreIndex], type: 'extraturn' });
+  }
+
+  const STEP = Math.max(22, Math.min(55, 480 / Math.max(1, moveSeq.length)));
+
+  let i = 0;
+  function step() {
+    if (i >= frames.length) {
+      mncAnimating = false;
+      mncLastPits = pits.slice();
+      const board = $('mncBoard');
+      if (board) board.innerHTML = buildMancalaBoard(v, pits);
+      // Flash special event in banner briefly
+      const banner = $('mncStatus');
+      if (banner && v.phase === 'battle') {
+        if (extraTurn && captureCount > 0) {
+          banner.textContent = `SNATCH +${captureCount} — BONUS SOW!`;
+          banner.className = 'status win';
+        } else if (extraTurn) {
+          banner.textContent = 'BONUS SOW! — go again';
+          banner.className = 'status win';
+        } else if (captureCount > 0) {
+          banner.textContent = `SNATCHED ${captureCount} seed${captureCount > 1 ? 's' : ''}!`;
+          banner.className = 'status win';
+        }
+        if (extraTurn || captureCount > 0) {
+          setTimeout(() => {
+            if (banner && v.phase === 'battle') {
+              banner.textContent = 'YOUR SOW — pick one of your pits';
+              banner.className = 'status you';
+            }
+          }, 1600);
+        }
+      }
+      return;
+    }
+    const frame = frames[i];
+    mncUpdatePit(frame.pit, frame.count, v);
+    if (frame.type === 'sow') mncBounce(frame.pit);
+    if (frame.type === 'capture-store') {
+      const storeEl = document.getElementById(`mnc-p${myStoreIndex}`);
+      if (storeEl) {
+        storeEl.classList.remove('capture-anim');
+        void storeEl.offsetWidth;
+        storeEl.classList.add('capture-anim');
+      }
+    }
+    if (frame.type === 'extraturn') {
+      const storeEl = document.getElementById(`mnc-p${myStoreIndex}`);
+      if (storeEl) {
+        storeEl.classList.remove('extraturn-anim');
+        void storeEl.offsetWidth;
+        storeEl.classList.add('extraturn-anim');
+      }
+    }
+    i++;
+    setTimeout(step, frame.type === 'pickup' ? STEP * 0.6 : STEP);
+  }
+  step();
+}
+
+function renderMancala(d, v) {
+  const board = $('mncBoard');
+  if (!board) return;
+
+  const moveTag = v.moveSeq && v.moveSeq.length > 0
+    ? `${v.movePickup}:${v.moveSeq.join(',')}` : '';
+  const hasNewMove = moveTag && moveTag !== mncLastMoveTag && !!mncLastPits;
+  const pitsChanged = mncLastPits && v.pits.some((p, i) => p !== mncLastPits[i]);
+
+  if (!board.children.length) {
+    board.innerHTML = buildMancalaBoard(v, v.pits);
+    mncLastPits = v.pits.slice();
+  } else if (hasNewMove && !mncAnimating && pitsChanged) {
+    board.innerHTML = buildMancalaBoard(v, mncLastPits);
+    mncAnimateMove(v, mncLastPits);
+  } else if (!mncAnimating) {
+    board.innerHTML = buildMancalaBoard(v, v.pits);
+    mncLastPits = v.pits.slice();
+  }
+
+  mncLastMoveTag = moveTag || mncLastMoveTag;
+
+  const myScore  = v.pits[v.myStoreIndex];
+  const oppScore = v.pits[v.oppStoreIndex];
+  const banner = $('mncStatus');
+
+  if (v.phase === 'over') {
+    const tied = v.winner === 'draw';
+    const won  = v.winner === v.myPiece;
+    banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    banner.textContent = tied
+      ? `DRAW — ${myScore} to ${oppScore}`
+      : won
+        ? `VICTORY — you captured ${myScore} seeds`
+        : `DEFEAT — opponent captured ${oppScore} seeds`;
+  } else if (v.isMyTurn) {
+    banner.className = 'status you';
+    banner.textContent = 'YOUR SOW — pick one of your pits';
+  } else {
+    banner.className = 'status them';
+    banner.textContent = `OPPONENT TURN — ${d.opponentName || 'opponent'} is sowing...`;
+  }
+
+  const legend = $('mncLegend');
+  if (legend) {
+    legend.innerHTML =
+      `<span><span class="mnc-seed mine"></span>You — <span class="mnc-legend-score mine">${myScore}</span></span>` +
+      `<span>Opp — <span class="mnc-legend-score opp">${oppScore}</span><span class="mnc-seed opp" style="margin-left:5px"></span></span>`;
+  }
+}
+
+async function moveMancala(pitIdx) {
+  if (!lastView || lastView.phase !== 'battle' || !lastView.isMyTurn) { toast('Not your turn.'); return; }
+  if (!lastView.validMoves.includes(pitIdx)) { toast('That pit is empty.'); return; }
+
+  // Optimistically apply human move locally so animation baseline is post-human state
+  try {
+    const reg = window.TurnBasedGamesRegistry;
+    const mod = reg ? reg.getGame('mancala').module : (window.TurnBasedGames || {}).mancala;
+    if (mod && lastView.pits) {
+      const fake = {
+        pits: lastView.pits.slice(), phase: 'battle', turn: lastView.myPiece,
+        lastSeq: [], lastPickup: null, lastExtraTurn: false, lastCapture: 0, lastCaptureFrom: -1,
+      };
+      mod.applyMove(fake, lastView.myPiece, { pit: pitIdx });
+      mncLastPits = fake.pits.slice();
+    }
+  } catch (_) { mncLastPits = lastView.pits ? lastView.pits.slice() : null; }
+
+  try {
+    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { pit: pitIdx } });
     poll();
   } catch (e) { toast(e.message); }
 }

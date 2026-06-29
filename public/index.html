@@ -250,6 +250,141 @@
   body.is-phone .uttt-mini { gap: 2px; padding: 2px; }
   @media (min-width: 720px) { .uttt-panel { max-width: 620px; margin-left: auto; margin-right: auto; } }
 
+  /* Mancala */
+  .mnc-panel { overflow: hidden; }
+  .mnc-wrap {
+    margin-top: 14px; padding: 10px;
+    border: 1px solid rgba(255,179,71,.22); border-radius: 18px;
+    background: linear-gradient(180deg, #1c0e04, #0e0702);
+    box-shadow: inset 0 0 32px rgba(0,0,0,.55), 0 18px 40px rgba(0,0,0,.4);
+  }
+  .mnc-board {
+    display: grid;
+    grid-template-columns: 52px 1fr 52px;
+    grid-template-rows: 1fr 1fr;
+    gap: 6px;
+    padding: 10px;
+    background: linear-gradient(155deg, #2c1507, #180b03);
+    border-radius: 14px;
+    border: 1px solid rgba(255,179,71,.18);
+  }
+  .mnc-store {
+    grid-row: 1 / span 2;
+    border-radius: 999px;
+    background: radial-gradient(ellipse at 40% 30%, #120801, #070401 70%);
+    box-shadow: inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03), 0 0 0 1px rgba(0,0,0,.7);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 0; min-height: 88px;
+    transition: box-shadow .2s ease;
+  }
+  .mnc-store.mine {
+    box-shadow: inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03),
+                0 0 0 2px rgba(255,179,71,.45), 0 0 14px rgba(255,179,71,.14);
+  }
+  .mnc-store.opp {
+    box-shadow: inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03),
+                0 0 0 1px rgba(52,231,196,.28), 0 0 10px rgba(52,231,196,.08);
+  }
+  .mnc-store .mnc-scount {
+    font-size: clamp(22px, 7vw, 34px); font-weight: 900; line-height: 1;
+    letter-spacing: -1px; transition: transform .15s ease;
+  }
+  .mnc-store.mine .mnc-scount { color: var(--amber); text-shadow: 0 0 12px rgba(255,179,71,.5); }
+  .mnc-store.opp  .mnc-scount { color: var(--sonar); text-shadow: 0 0 10px rgba(52,231,196,.4); }
+  .mnc-store .mnc-slabel {
+    font-size: 9px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--mute);
+  }
+  .mnc-row {
+    display: flex; gap: 5px; align-items: stretch; padding: 0;
+  }
+  .mnc-row.opp { grid-column: 2; grid-row: 1; }
+  .mnc-row.mine { grid-column: 2; grid-row: 2; }
+  .mnc-pit {
+    flex: 1; aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 38% 30%, #1c0e04, #080402 68%);
+    box-shadow: inset 0 5px 12px rgba(0,0,0,.75), inset 0 -1px 3px rgba(255,255,255,.04), 0 0 0 1px rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center;
+    cursor: default; position: relative;
+    transition: transform .1s ease, box-shadow .12s ease;
+    user-select: none; touch-action: manipulation;
+  }
+  .mnc-pit.valid {
+    cursor: pointer;
+    box-shadow: inset 0 5px 12px rgba(0,0,0,.6), 0 0 0 2px rgba(255,179,71,.6), 0 0 12px rgba(255,179,71,.22);
+  }
+  .mnc-pit.valid:active { transform: scale(.91); }
+  .mnc-pit.empty { opacity: .38; }
+  .mnc-count {
+    font-size: clamp(13px, 4.6vw, 21px); font-weight: 900; line-height: 1;
+    letter-spacing: -.5px; pointer-events: none;
+  }
+  .mnc-pit.mine .mnc-count { color: var(--amber); }
+  .mnc-pit.opp  .mnc-count { color: var(--sonar); opacity: .8; }
+  .mnc-pit.empty .mnc-count { opacity: 0; }
+  /* hide number when seeds ≤5 — dice dots take over */
+  .mnc-pit:not(.many):not(.empty) .mnc-count { opacity: 0; }
+  /* dice-face SVG stones for 1-5 seeds */
+  .mnc-dots-svg {
+    position: absolute; inset: 14% 16%; width: 68%; height: 68%;
+    pointer-events: none; overflow: visible;
+  }
+  .mnc-pit.mine .mnc-dots-svg circle { fill: var(--amber); filter: drop-shadow(0 0 3px rgba(255,179,71,.55)); }
+  .mnc-pit.opp  .mnc-dots-svg circle { fill: var(--sonar);  filter: drop-shadow(0 0 2px rgba(52,231,196,.4)); }
+
+  /* landing bounce */
+  @keyframes mnc-land {
+    0%   { transform: scale(1); }
+    28%  { transform: scale(1.32); filter: brightness(1.6); }
+    60%  { transform: scale(.93); filter: brightness(1.1); }
+    100% { transform: scale(1);   filter: brightness(1); }
+  }
+  .mnc-pit.land { animation: mnc-land .26s ease-out; }
+
+  /* capture flash on winning store */
+  @keyframes mnc-capture-flash {
+    0%   { filter: brightness(1); }
+    25%  { filter: brightness(2.2); }
+    60%  { filter: brightness(1.4); }
+    100% { filter: brightness(1); }
+  }
+  .mnc-store.capture-anim { animation: mnc-capture-flash .5s ease-out; }
+
+  /* extra-turn store pulse */
+  @keyframes mnc-extraturn {
+    0%, 100% { transform: scaleY(1); }
+    50%       { transform: scaleY(1.07);
+                box-shadow: inset 0 6px 18px rgba(0,0,0,.6), 0 0 0 3px var(--sonar), 0 0 22px rgba(52,231,196,.4); }
+  }
+  .mnc-store.extraturn-anim { animation: mnc-extraturn .55s ease-in-out 2; }
+
+  .mnc-legend {
+    display: flex; justify-content: space-between; gap: 10px;
+    margin-top: 12px; color: var(--mute); font-size: 12px;
+    align-items: center;
+  }
+  .mnc-legend-score { font-size: 15px; font-weight: 700; letter-spacing: -.5px; }
+  .mnc-legend-score.mine { color: var(--amber); }
+  .mnc-legend-score.opp  { color: var(--sonar); }
+  .mnc-seed {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 5px; vertical-align: -1px;
+  }
+  .mnc-seed.mine { background: var(--amber); box-shadow: 0 0 7px rgba(255,179,71,.5); }
+  .mnc-seed.opp  { background: var(--sonar);  box-shadow: 0 0 7px rgba(52,231,196,.4); }
+
+  body.is-phone .mnc-wrap { padding: 6px; }
+  body.is-phone .mnc-board { grid-template-columns: 38px 1fr 38px; gap: 4px; padding: 6px; }
+  body.is-phone .mnc-row { gap: 3px; }
+  body.is-phone .mnc-store { min-height: 72px; }
+  body.is-phone .mnc-store .mnc-scount { font-size: clamp(18px, 7vw, 26px); }
+  @media (min-width: 720px) {
+    .mnc-panel { max-width: 620px; margin-left: auto; margin-right: auto; }
+    .mnc-board { grid-template-columns: 64px 1fr 64px; gap: 8px; padding: 12px; }
+    .mnc-pit .mnc-count { font-size: 22px; }
+    .mnc-store .mnc-scount { font-size: 36px; }
+  }
+
   /* UNO */
   .one-card-panel { overflow: hidden; }
   #oneCard .portrait-recommended { display: none !important; }
@@ -530,6 +665,16 @@
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
+  <!-- MANCALA -->
+  <section id="mancala" class="card mnc-panel hidden">
+    <div id="mncStatus" class="status">...</div>
+    <div class="mnc-wrap">
+      <div id="mncBoard" class="mnc-board"></div>
+    </div>
+    <div class="mnc-legend" id="mncLegend"></div>
+    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+  </section>
+
   <!-- ULTIMATE TTT -->
   <section id="ultimateTTT" class="card uttt-panel hidden">
     <div id="utttStatus" class="status">...</div>
@@ -548,6 +693,7 @@
 <script src="games/battleship.js"></script>
 <script src="games/connectfour.js"></script>
 <script src="games/onecard.js"></script>
+<script src="games/mancala.js"></script>
 <script src="games/ultimatettt.js"></script>
 <script src="solo.js"></script>
 <script src="app.js"></script>
