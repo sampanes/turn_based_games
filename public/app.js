@@ -170,6 +170,29 @@ async function copyRoomCode() {
 
 function enterRoom() { startPoll(); poll(); }
 
+async function restartComputerGame() {
+  if (!session || session.mode !== 'computer') return;
+  const game = session.game || selectedGameId();
+  const name = ($('name1') && $('name1').value.trim()) || 'Player 1';
+  try {
+    clearSession();
+    resetGameUi();
+    lastView = null;
+    session = { mode: 'computer' };
+    const d = await api('/api/create', 'POST', { game, name });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer' });
+    toast('New game started.');
+    enterRoom();
+  } catch (e) { clearSession(); toast(e.message); }
+}
+
+function updateSoloRestartButtons() {
+  document.querySelectorAll('.solo-restart').forEach(btn => {
+    btn.classList.toggle('hidden', !(session && session.mode === 'computer'));
+  });
+}
+
+
 function startPoll() { stopPoll(); pollTimer = setInterval(poll, 3000); }
 function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
 
@@ -184,6 +207,7 @@ async function poll() {
 }
 
 function render(d) {
+  updateSoloRestartButtons();
   const v = d.view;
   lastView = v;
   fleetDef = v.fleet || fleetDef || [];
@@ -265,17 +289,21 @@ function initPlacement() {
   resetPlacement();
   const g = $('placeGrid');
   g.dataset.size = String(boardSize);
+  g.onpointermove = dragPreviewPlacement;
+  g.onpointerup = finishPlacementDrag;
+  g.onpointercancel = cancelPlacementDrag;
   g.style.gridTemplateColumns = `repeat(${boardSize}, 1fr)`;
   for (let r = 0; r < boardSize; r++) for (let c = 0; c < boardSize; c++) {
     const cell = document.createElement('div');
     cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
     cell.onclick = () => {
       if (ignoreNextPlacementClick) { ignoreNextPlacementClick = false; return; }
-      placeAt(r, c);
+      clickPlacementCell(r, c);
     };
     cell.onpointerdown = event => startPlacementDrag(event, r, c);
-    cell.onpointerenter = event => dragPreviewPlacement(event, r, c);
-    cell.onpointerup = event => finishPlacementDrag(event, r, c);
+    cell.onpointermove = event => dragPreviewPlacement(event);
+    cell.onpointerup = event => finishPlacementDrag(event);
+    cell.onpointercancel = event => cancelPlacementDrag(event);
     cell.onmouseenter = () => previewPlacement(r, c);
     cell.onmouseleave = () => { if (!placementDrag) renderPlaceGrid(); };
     g.appendChild(cell);
@@ -306,20 +334,42 @@ function renderFleetList() {
   $('readyBtn').disabled = placedShips.length !== fleetDef.length;
 }
 
-function shipCells(r, c, size) {
+function parseGridCellKey(cell) {
+  const [r, c] = cell.split(',').map(Number);
+  return { r, c };
+}
+
+function shipCells(r, c, size, shipOrient = orient) {
   const cells = [];
-  for (let i = 0; i < size; i++) cells.push(orient === 'H' ? `${r},${c + i}` : `${r + i},${c}`);
+  for (let i = 0; i < size; i++) cells.push(shipOrient === 'H' ? `${r},${c + i}` : `${r + i},${c}`);
   return cells;
 }
-function occupiedSet() { const s = new Set(); placedShips.forEach(p => p.cells.forEach(x => s.add(x))); return s; }
+function clampShipStart(r, c, size, shipOrient = orient) {
+  const maxR = shipOrient === 'H' ? boardSize - 1 : boardSize - size;
+  const maxC = shipOrient === 'H' ? boardSize - size : boardSize - 1;
+  return { r: Math.max(0, Math.min(maxR, r)), c: Math.max(0, Math.min(maxC, c)) };
+}
+function placementCellFromPointer(event, drag = placementDrag) {
+  const grid = $('placeGrid');
+  const rect = grid.getBoundingClientRect();
+  const x = Math.max(0, Math.min(rect.width - 1, event.clientX - rect.left));
+  const y = Math.max(0, Math.min(rect.height - 1, event.clientY - rect.top));
+  const cell = rect.width / boardSize;
+  const r = Math.floor(y / cell) - (drag && drag.offsetR || 0);
+  const c = Math.floor(x / cell) - (drag && drag.offsetC || 0);
+  return clampShipStart(r, c, drag && drag.size || (fleetDef[selectedShip] && fleetDef[selectedShip].size) || 1, drag && drag.orient || orient);
+}
 
-function placeAt(r, c) {
-  const existing = placedShipAt(`${r},${c}`);
-  if (existing) { removePlacedShip(existing); return; }
+function occupiedSet(ignoreName) { const s = new Set(); placedShips.filter(p => p.name !== ignoreName).forEach(p => p.cells.forEach(x => s.add(x))); return s; }
+
+function placeAt(r, c, opts = {}) {
+  const existing = !opts.fromDrag && placedShipAt(`${r},${c}`);
+  if (existing) { rotatePlacedShip(existing); return; }
   if (selectedShip == null) return;
   const def = fleetDef[selectedShip];
   if (placedShips.find(p => p.name === def.name)) return; // already placed; tap list to pull back
-  const cells = shipCells(r, c, def.size);
+  const start = clampShipStart(r, c, def.size, orient);
+  const cells = shipCells(start.r, start.c, def.size, orient);
   const occ = occupiedSet();
   for (const cell of cells) {
     const [rr, cc] = cell.split(',').map(Number);
@@ -327,14 +377,51 @@ function placeAt(r, c) {
     if (occ.has(cell)) { toast('Ships cannot overlap.'); return; }
   }
   placedShips.push({ name: def.name, size: def.size, cells, orient });
-  // advance to next unplaced
-  const nextIdx = fleetDef.findIndex(s => !placedShips.find(p => p.name === s.name));
-  selectedShip = nextIdx === -1 ? null : nextIdx;
   renderFleetList(); renderPlaceGrid();
 }
 
 function placedShipAt(key) {
   return placedShips.find(ship => ship.cells.includes(key));
+}
+
+function clickPlacementCell(r, c) {
+  const ship = placedShipAt(`${r},${c}`);
+  if (ship) { rotatePlacedShip(ship); return; }
+  placeAt(r, c);
+}
+
+function rotatePlacedShip(ship) {
+  const oldOrient = ship.orient || 'H';
+  const newOrient = oldOrient === 'H' ? 'V' : 'H';
+  const head = parseGridCellKey(ship.cells[0]);
+  const start = clampShipStart(head.r, head.c, ship.size, newOrient);
+  const cells = shipCells(start.r, start.c, ship.size, newOrient);
+  const occ = occupiedSet(ship.name);
+  if (cells.some(cell => occ.has(cell))) { toast('No room to rotate there.'); return false; }
+  ship.orient = newOrient;
+  ship.cells = cells;
+  selectedShip = fleetDef.findIndex(s => s.name === ship.name);
+  orient = newOrient;
+  $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
+  renderFleetList(); renderPlaceGrid();
+  return true;
+}
+
+function canPlaceCells(cells, ignoreName) {
+  const occ = occupiedSet(ignoreName);
+  return cells.every(cell => !occ.has(cell));
+}
+
+function findNearbyPlacement(r, c, size, shipOrient, ignoreName) {
+  for (let radius = 0; radius < boardSize; radius++) {
+    for (let dr = -radius; dr <= radius; dr++) for (let dc = -radius; dc <= radius; dc++) {
+      if (Math.max(Math.abs(dr), Math.abs(dc)) !== radius) continue;
+      const start = clampShipStart(r + dr, c + dc, size, shipOrient);
+      const cells = shipCells(start.r, start.c, size, shipOrient);
+      if (canPlaceCells(cells, ignoreName)) return { ...start, cells };
+    }
+  }
+  return null;
 }
 
 function removePlacedShip(ship) {
@@ -354,6 +441,7 @@ function renderPlaceGrid(preview = []) {
   const occ = occupiedSet();
   const previewSet = new Set(preview.map(item => item.key));
   const blocked = preview.some(item => item.blocked);
+  const overlap = preview.some(item => item.overlap);
   document.querySelectorAll('#placeGrid .cell').forEach(cell => {
     const key = `${cell.dataset.r},${cell.dataset.c}`;
     let cls = 'cell';
@@ -361,6 +449,7 @@ function renderPlaceGrid(preview = []) {
     if (occ.has(key)) cls += ' ship';
     if (ship && ship.cells[0] === key) cls += ' ship-bow';
     if (previewSet.has(key)) cls += blocked ? ' blocked' : ' preview';
+    if (previewSet.has(key) && overlap) cls += ' overlap-preview';
     cell.className = cls;
     cell.textContent = ship && ship.cells[0] === key ? ship.name[0] : '';
     cell.title = ship ? `${ship.name} - tap or drag to move` : '';
@@ -370,10 +459,12 @@ function renderPlaceGrid(preview = []) {
 function placementPreviewCells(r, c) {
   if (selectedShip == null || !fleetDef[selectedShip]) return [];
   const def = fleetDef[selectedShip];
-  const occ = occupiedSet();
-  return shipCells(r, c, def.size).map(key => {
+  const start = clampShipStart(r, c, def.size, orient);
+  const occ = occupiedSet(def.name);
+  return shipCells(start.r, start.c, def.size, orient).map(key => {
     const [rr, cc] = key.split(',').map(Number);
-    return { key, blocked: rr < 0 || rr >= boardSize || cc < 0 || cc >= boardSize || occ.has(key) };
+    const overlap = occ.has(key);
+    return { key, blocked: rr < 0 || rr >= boardSize || cc < 0 || cc >= boardSize || overlap, overlap };
   });
 }
 
@@ -388,32 +479,64 @@ function previewPlacement(r, c) {
 function startPlacementDrag(event, r, c) {
   const key = `${r},${c}`;
   const ship = placedShipAt(key);
+  const grid = $('placeGrid');
+  if (event.pointerId != null) grid.setPointerCapture && grid.setPointerCapture(event.pointerId);
   if (ship) {
-    removePlacedShip(ship);
-    placementDrag = { active: true, moved: false };
-    previewPlacement(r, c);
+    const idx = ship.cells.indexOf(key);
+    const offsetR = (ship.orient || 'H') === 'H' ? 0 : idx;
+    const offsetC = (ship.orient || 'H') === 'H' ? idx : 0;
+    placedShips = placedShips.filter(p => p.name !== ship.name);
+    selectedShip = fleetDef.findIndex(s => s.name === ship.name);
+    orient = ship.orient || 'H';
+    placementDrag = { active: true, moved: false, fromShip: true, original: ship, name: ship.name, size: ship.size, orient, offsetR, offsetC };
+  } else {
+    if (selectedShip == null || !fleetDef[selectedShip]) return;
+    const def = fleetDef[selectedShip];
+    placementDrag = { active: true, moved: false, name: def.name, size: def.size, orient, offsetR: 0, offsetC: 0 };
+  }
+  const pos = placementCellFromPointer(event);
+  previewPlacement(pos.r, pos.c);
+  event.preventDefault();
+}
+
+function dragPreviewPlacement(event) {
+  if (!placementDrag || !placementDrag.active || !(event.buttons & 1)) return;
+  placementDrag.moved = true;
+  const pos = placementCellFromPointer(event);
+  previewPlacement(pos.r, pos.c);
+}
+
+function finishPlacementDrag(event) {
+  if (!placementDrag || !placementDrag.active) return;
+  const drag = placementDrag;
+  const pos = placementCellFromPointer(event, drag);
+  placementDrag = null;
+  ignoreNextPlacementClick = true;
+  if (drag.fromShip && !drag.moved) {
+    placedShips.push(drag.original);
+    rotatePlacedShip(drag.original);
     event.preventDefault();
     return;
   }
-  if (selectedShip == null || !fleetDef[selectedShip]) return;
-  placementDrag = { active: true, moved: false };
-  previewPlacement(r, c);
+  const cells = shipCells(pos.r, pos.c, drag.size, drag.orient);
+  const final = canPlaceCells(cells, drag.name) ? { ...pos, cells } : findNearbyPlacement(pos.r, pos.c, drag.size, drag.orient, drag.name);
+  if (!final) { toast('No clear water nearby.'); renderFleetList(); renderPlaceGrid(); event.preventDefault(); return; }
+  placedShips = placedShips.filter(p => p.name !== drag.name);
+  placedShips.push({ name: drag.name, size: drag.size, cells: final.cells, orient: drag.orient });
+  selectedShip = fleetDef.findIndex(s => s.name === drag.name);
+  orient = drag.orient;
+  $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
+  renderFleetList(); renderPlaceGrid();
   event.preventDefault();
 }
 
-function dragPreviewPlacement(event, r, c) {
-  if (!placementDrag || !placementDrag.active || !(event.buttons & 1)) return;
-  placementDrag.moved = true;
-  previewPlacement(r, c);
-}
-
-function finishPlacementDrag(event, r, c) {
-  if (!placementDrag || !placementDrag.active) return;
+function cancelPlacementDrag(event) {
+  const drag = placementDrag;
   placementDrag = null;
-  ignoreNextPlacementClick = true;
-  placeAt(r, c);
-  event.preventDefault();
+  if (drag && drag.fromShip && !placedShips.find(p => p.name === drag.original.name)) placedShips.push(drag.original);
+  renderFleetList(); renderPlaceGrid();
 }
+
 
 function toggleOrient() {
   orient = orient === 'H' ? 'V' : 'H';
