@@ -111,6 +111,7 @@
   .board-label h3 { margin: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
   .board-label .left { font-size: 11px; color: var(--mute); letter-spacing: 1px; }
   .grid {
+    position: relative;
     display: grid; grid-template-columns: repeat(10, 1fr); gap: var(--grid-gap);
     aspect-ratio: 1; width: min(100%, calc(100dvh - 230px)); min-width: 0; margin-inline: auto;
     background: var(--line); border: 2px solid var(--line); border-radius: 8px; padding: var(--grid-gap);
@@ -141,6 +142,17 @@
   .grid.hit-flash { animation: hitFlash .7s ease; }
   .grid.miss-flash { animation: missFlash .7s ease; }
   .cell.ripple { animation: ripple .5s ease-out; }
+  .battle-aim {
+    position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none;
+    border: 3px solid var(--fire); border-radius: 50%;
+    filter: drop-shadow(0 0 8px rgba(255,91,81,.9));
+    transition: transform .16s cubic-bezier(.2,.8,.2,1), width .16s ease, height .16s ease;
+  }
+  .battle-aim::before, .battle-aim::after { content: ""; position: absolute; background: var(--fire); box-shadow: 0 0 8px rgba(255,91,81,.75); }
+  .battle-aim::before { left: 50%; top: -20%; width: 2px; height: 140%; transform: translateX(-50%); }
+  .battle-aim::after { top: 50%; left: -20%; height: 2px; width: 140%; transform: translateY(-50%); }
+  .battle-aim.locked { animation: aimLock .34s ease-out; }
+  @keyframes aimLock { 45% { filter: drop-shadow(0 0 16px rgba(255,91,81,1)); } 100% { opacity: 0; } }
   @keyframes ripple { 0% { box-shadow: 0 0 0 0 rgba(52,231,196,.6);} 100% { box-shadow: 0 0 0 12px rgba(52,231,196,0);} }
   @keyframes shotConfirm { 0% { transform: scale(.65); filter: brightness(1.8); } 55% { transform: scale(1.22); } 100% { transform: scale(1); } }
   @keyframes hitFlash { 0%, 100% { border-color: var(--line); } 35% { border-color: var(--fire); box-shadow: 0 0 26px rgba(255,91,81,.38); } }
@@ -259,6 +271,7 @@
     box-shadow: inset 0 0 32px rgba(0,0,0,.55), 0 18px 40px rgba(0,0,0,.4);
   }
   .mnc-board {
+    position: relative;
     display: grid;
     grid-template-columns: 52px 1fr 52px;
     grid-template-rows: 1fr 1fr;
@@ -340,6 +353,21 @@
     100% { transform: scale(1);   filter: brightness(1); }
   }
   .mnc-pit.land { animation: mnc-land .26s ease-out; }
+  .mnc-pit.pickup { animation: mnc-pickup .32s ease-out; }
+  @keyframes mnc-pickup { 0% { transform: scale(1); } 45% { transform: translateY(-8px) scale(1.12); filter: brightness(1.7); } 100% { transform: scale(1); } }
+  .mnc-floater {
+    position: absolute; z-index: 5; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+    border-radius: 50%; pointer-events: none;
+    animation: mnc-fly .36s cubic-bezier(.15,.75,.28,1) forwards;
+  }
+  .mnc-floater.mine { background: var(--amber); box-shadow: 0 0 10px rgba(255,179,71,.8); }
+  .mnc-floater.opp { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.65); }
+  @keyframes mnc-fly {
+    0% { transform: translate(0, 0) scale(.9); opacity: 0; }
+    18% { opacity: 1; }
+    55% { transform: translate(calc(var(--dx) * .55), calc(var(--dy) * .55 - 24px)) scale(1.2); }
+    100% { transform: translate(var(--dx), var(--dy)) scale(.75); opacity: 0; }
+  }
 
   /* capture flash on winning store */
   @keyframes mnc-capture-flash {
