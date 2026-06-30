@@ -136,6 +136,7 @@
   .cell.placing { background: rgba(52,231,196,.18); }
   .cell.preview { background: rgba(52,231,196,.28); box-shadow: inset 0 0 0 1px var(--sonar); }
   .cell.blocked { background: rgba(255,91,81,.22); box-shadow: inset 0 0 0 1px var(--fire); }
+  .cell.overlap-preview { opacity: .45; }
   .cell.last-shot { outline: 3px solid #fff; outline-offset: -4px; animation: shotConfirm .9s ease both; z-index: 1; }
   .cell.outgoing-shot { box-shadow: 0 0 18px rgba(52,231,196,.58), inset 0 0 0 1px rgba(255,255,255,.2); }
   .cell.incoming-shot { box-shadow: 0 0 18px rgba(255,179,71,.48), inset 0 0 0 1px rgba(255,255,255,.2); }
@@ -638,6 +639,7 @@
       <span class="left" id="myLeft"></span>
     </div>
     <div class="grid" id="myGrid"></div>
+    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
@@ -655,6 +657,7 @@
       <span><span class="disc-dot A"></span>You</span>
       <span><span class="disc-dot B"></span>Opponent</span>
     </div>
+    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
@@ -690,6 +693,7 @@
       </div>
       <div id="oneCardHand" class="one-card-hand"></div>
     </div>
+    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
@@ -700,6 +704,7 @@
       <div id="mncBoard" class="mnc-board"></div>
     </div>
     <div class="mnc-legend" id="mncLegend"></div>
+    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
@@ -710,6 +715,7 @@
       <div id="utttBoard" class="uttt-board"></div>
     </div>
     <div class="uttt-legend" id="utttLegend"></div>
+    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
