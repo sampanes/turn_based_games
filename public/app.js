@@ -9,6 +9,7 @@ let lastView = null;
 let boardSize = 10;
 let lastBattleEventKey = null;
 let lastBattleTurn = null;
+let battleAimAnimation = null;
 let placementDrag = null;
 let ignoreNextPlacementClick = false;
 let oneCardHandUi = { selectedIndex: 0, selectedCardId: null, raised: false, gesture: null };
@@ -243,6 +244,9 @@ function resetGameUi() {
   $('oneCardHand').innerHTML = '';
   lastBattleEventKey = null;
   lastBattleTurn = null;
+  battleAimAnimation = null;
+  const aim = $('battleAim');
+  if (aim) aim.remove();
 }
 
 // ---------------- placement ----------------
@@ -467,6 +471,9 @@ function renderBattle(d, v) {
   const newShot = !!shotKey && shotKey !== lastBattleEventKey;
   const turnChanged = v.turn !== lastBattleTurn;
   const yourTurn = v.phase === 'battle' && v.turn === d.you;
+  const incomingNewShot = newShot && shot && shot.by !== d.you;
+  if (incomingNewShot && !battleAimAnimation) startBattleAimAnimation(shot, d);
+  const concealIncoming = battleAimAnimation && battleAimAnimation.key === shotKey;
   $('battle').classList.toggle('your-turn', yourTurn);
   $('fireGrid').classList.toggle('ready-to-fire', yourTurn);
 
@@ -484,12 +491,14 @@ function renderBattle(d, v) {
   document.querySelectorAll('#myGrid .cell').forEach(cell => {
     const r = +cell.dataset.r;
     const c = +cell.dataset.c;
-    const sq = v.myBoard[r][c];
+    const rawSq = v.myBoard[r][c];
+    const hideShot = concealIncoming && shot && shot.r === r && shot.c === c;
+    const sq = hideShot ? { ...rawSq, shot: null } : rawSq;
     let cls = 'cell';
     if (sq.shot === 'hit') cls += ' hit incoming-hit';
     else if (sq.shot === 'miss') cls += ' miss';
     else if (sq.ship) cls += ' ship';
-    if (shot && shot.by !== d.you && shot.r === r && shot.c === c) cls += ' last-shot incoming-shot';
+    if (!hideShot && shot && shot.by !== d.you && shot.r === r && shot.c === c) cls += ' last-shot incoming-shot';
     cell.className = cls;
     const shipText = sq.ship ? 'ship' : 'water';
     cell.setAttribute('aria-label', sq.shot ? `Opponent ${sq.shot} on your ${shipText} at ${coordLabel(r, c)}` : `Your ${shipText} at ${coordLabel(r, c)}`);
@@ -508,7 +517,7 @@ function renderBattle(d, v) {
     banner.textContent = battleStatusText(v, d) || 'YOUR TURN - tap enemy waters to fire';
   } else {
     banner.className = 'status them';
-    banner.textContent = battleStatusText(v, d) || `OPPONENT TURN - ${d.opponentName || 'opponent'} is taking aim...`;
+    banner.textContent = concealIncoming ? `${d.opponentName || 'Opponent'} is sweeping the grid...` : (battleStatusText(v, d) || `OPPONENT TURN - ${d.opponentName || 'opponent'} is taking aim...`);
   }
 
   if (newShot || turnChanged) {
@@ -516,14 +525,60 @@ function renderBattle(d, v) {
     void banner.offsetWidth;
     banner.classList.add('activity');
   }
-  if (newShot && shot) {
+  if (newShot && shot && !concealIncoming) {
     const grid = shot.by === d.you ? $('fireGrid') : $('myGrid');
     grid.classList.remove(shot.result === 'hit' ? 'hit-flash' : 'miss-flash');
     void grid.offsetWidth;
     grid.classList.add(shot.result === 'hit' ? 'hit-flash' : 'miss-flash');
   }
-  lastBattleEventKey = shotKey;
+  if (!concealIncoming) lastBattleEventKey = shotKey;
   lastBattleTurn = v.turn;
+}
+
+function startBattleAimAnimation(shot, d) {
+  const grid = $('myGrid');
+  if (!grid) return;
+  const key = `${shot.by}:${shot.r},${shot.c}:${shot.result}:${shot.sunk || ''}`;
+  const aim = document.createElement('div');
+  aim.id = 'battleAim';
+  aim.className = 'battle-aim';
+  aim.setAttribute('aria-hidden', 'true');
+  grid.appendChild(aim);
+  battleAimAnimation = { key, element: aim };
+
+  const hops = 10;
+  const cells = Array.from(grid.querySelectorAll('.cell'));
+  const target = grid.querySelector(`.cell[data-r="${shot.r}"][data-c="${shot.c}"]`);
+  const path = Array.from({ length: hops - 1 }, () => cells[Math.floor(Math.random() * cells.length)]).concat(target).filter(Boolean);
+  let i = 0;
+  function place(el) {
+    const gr = grid.getBoundingClientRect();
+    const cr = el.getBoundingClientRect();
+    aim.style.width = `${cr.width}px`;
+    aim.style.height = `${cr.height}px`;
+    aim.style.transform = `translate(${cr.left - gr.left}px, ${cr.top - gr.top}px)`;
+  }
+  function hop() {
+    if (!battleAimAnimation || battleAimAnimation.key !== key) return;
+    if (i >= path.length) {
+      aim.classList.add('locked');
+      setTimeout(() => {
+        if (aim.parentNode) aim.remove();
+        battleAimAnimation = null;
+        lastBattleEventKey = key;
+        renderBattle({ ...d }, lastView);
+        grid.classList.remove(shot.result === 'hit' ? 'hit-flash' : 'miss-flash');
+        void grid.offsetWidth;
+        grid.classList.add(shot.result === 'hit' ? 'hit-flash' : 'miss-flash');
+      }, 360);
+      return;
+    }
+    place(path[i]);
+    const delay = 70 + i * 28;
+    i++;
+    setTimeout(hop, delay);
+  }
+  hop();
 }
 
 function coordLabel(r, c) {
@@ -950,6 +1005,28 @@ function mncUpdatePit(pitIdx, count, v) {
   }
 }
 
+function mncFlySeed(fromPit, toPit, who) {
+  const board = $('mncBoard');
+  const from = document.getElementById(`mnc-p${fromPit}`);
+  const to = document.getElementById(`mnc-p${toPit}`);
+  if (!board || !from || !to) return;
+  const br = board.getBoundingClientRect();
+  const fr = from.getBoundingClientRect();
+  const tr = to.getBoundingClientRect();
+  const seed = document.createElement('span');
+  seed.className = `mnc-floater ${who === 'opp' ? 'opp' : 'mine'}`;
+  const sx = fr.left - br.left + fr.width / 2;
+  const sy = fr.top - br.top + fr.height / 2;
+  const ex = tr.left - br.left + tr.width / 2;
+  const ey = tr.top - br.top + tr.height / 2;
+  seed.style.left = `${sx}px`;
+  seed.style.top = `${sy}px`;
+  seed.style.setProperty('--dx', `${ex - sx}px`);
+  seed.style.setProperty('--dy', `${ey - sy}px`);
+  board.appendChild(seed);
+  setTimeout(() => seed.remove(), 380);
+}
+
 function mncBounce(pitIdx) {
   const el = document.getElementById(`mnc-p${pitIdx}`);
   if (!el) return;
@@ -987,7 +1064,7 @@ function mncAnimateMove(v, prevPits) {
     frames.push({ pit: myStoreIndex, count: pits[myStoreIndex], type: 'extraturn' });
   }
 
-  const STEP = Math.max(22, Math.min(55, 480 / Math.max(1, moveSeq.length)));
+  const STEP = Math.max(80, Math.min(150, 900 / Math.max(1, moveSeq.length)));
 
   let i = 0;
   function step() {
@@ -1021,6 +1098,15 @@ function mncAnimateMove(v, prevPits) {
       return;
     }
     const frame = frames[i];
+    if (frame.type === 'pickup') {
+      const source = document.getElementById(`mnc-p${frame.pit}`);
+      if (source) {
+        source.classList.remove('pickup');
+        void source.offsetWidth;
+        source.classList.add('pickup');
+      }
+    }
+    if (frame.type === 'sow') mncFlySeed(movePickup, frame.pit, v.myPitIndices.includes(movePickup) || movePickup === v.myStoreIndex ? 'mine' : 'opp');
     mncUpdatePit(frame.pit, frame.count, v);
     if (frame.type === 'sow') mncBounce(frame.pit);
     if (frame.type === 'capture-store') {
@@ -1099,20 +1185,6 @@ function renderMancala(d, v) {
 async function moveMancala(pitIdx) {
   if (!lastView || lastView.phase !== 'battle' || !lastView.isMyTurn) { toast('Not your turn.'); return; }
   if (!lastView.validMoves.includes(pitIdx)) { toast('That pit is empty.'); return; }
-
-  // Optimistically apply human move locally so animation baseline is post-human state
-  try {
-    const reg = window.TurnBasedGamesRegistry;
-    const mod = reg ? reg.getGame('mancala').module : (window.TurnBasedGames || {}).mancala;
-    if (mod && lastView.pits) {
-      const fake = {
-        pits: lastView.pits.slice(), phase: 'battle', turn: lastView.myPiece,
-        lastSeq: [], lastPickup: null, lastExtraTurn: false, lastCapture: 0, lastCaptureFrom: -1,
-      };
-      mod.applyMove(fake, lastView.myPiece, { pit: pitIdx });
-      mncLastPits = fake.pits.slice();
-    }
-  } catch (_) { mncLastPits = lastView.pits ? lastView.pits.slice() : null; }
 
   try {
     await api('/api/move', 'POST', { room: session.room, token: session.token, move: { pit: pitIdx } });
