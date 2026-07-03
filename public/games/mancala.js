@@ -132,6 +132,7 @@
         lastExtraTurn: false,
         lastCapture: 0,
         lastCaptureFrom: -1,
+        moveNumber: 0,
       };
     },
 
@@ -160,6 +161,7 @@
       state.lastExtraTurn = extraTurn;
       state.lastCapture = cap.count;
       state.lastCaptureFrom = cap.from;
+      state.moveNumber = (state.moveNumber || 0) + 1;
 
       if (isGameOver(state.pits)) {
         state.pits = sweepBoard(state.pits);
@@ -197,6 +199,7 @@
         extraTurn:    state.lastExtraTurn,
         captureCount: state.lastCapture,
         captureFrom:  state.lastCaptureFrom,
+        moveNumber:   state.moveNumber || 0,
       };
     },
 

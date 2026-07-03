@@ -7,8 +7,9 @@ const { spawn } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
 const dataFile = path.join(os.tmpdir(), `turn-based-games-smoke-${process.pid}.json`);
+const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-function request(port, method, pathname, body) {
+function request(port, method, pathname, body, headers = {}) {
   const payload = body ? JSON.stringify(body) : null;
   return new Promise((resolve, reject) => {
     const req = http.request({
@@ -16,10 +17,13 @@ function request(port, method, pathname, body) {
       port,
       path: pathname,
       method,
-      headers: payload ? {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload),
-      } : {},
+      headers: {
+        ...headers,
+        ...(payload ? {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        } : {}),
+      },
     }, res => {
       let raw = '';
       res.setEncoding('utf8');
@@ -27,7 +31,7 @@ function request(port, method, pathname, body) {
       res.on('end', () => {
         let data = raw;
         try { data = JSON.parse(raw); } catch {}
-        resolve({ status: res.statusCode, data, raw });
+        resolve({ status: res.statusCode, data, raw, headers: res.headers });
       });
     });
     req.on('error', reject);
@@ -90,6 +94,15 @@ function testUnoTurnSyncAndSorting() {
   assert.strictEqual(state.turn, 'B');
 }
 
+function testMancalaMoveIdentity() {
+  const mancala = require('../public/games/mancala');
+  const state = mancala.init();
+  assert.strictEqual(state.moveNumber, 0);
+  assert.strictEqual(mancala.applyMove(state, 'A', { pit: 2 }), null);
+  assert.strictEqual(state.moveNumber, 1);
+  assert.strictEqual(mancala.viewFor(state, 'A').moveNumber, 1);
+}
+
 function fleet() {
   return [
     { name: 'Carrier', cells: ['0,0', '0,1', '0,2', '0,3', '0,4'] },
@@ -102,11 +115,17 @@ function fleet() {
 
 async function main() {
   testUnoTurnSyncAndSorting();
+  testMancalaMoveIdentity();
   try { fs.unlinkSync(dataFile); } catch {}
+  fs.writeFileSync(dataFile, JSON.stringify({
+    rooms: {
+      OLDD: { code: 'OLDD', createdAt: 1, players: {}, state: {} },
+    },
+  }));
 
   const child = spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, HOST: '127.0.0.1', PORT: '0', DATA_FILE: dataFile },
+    env: { ...process.env, HOST: '', PORT: '0', DATA_FILE: dataFile },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 
@@ -116,6 +135,8 @@ async function main() {
     assert.strictEqual(page.status, 200);
     assert.match(page.raw, /TURN-BASED GAMES/);
     assert.match(page.raw, /connectFour/);
+    assert.doesNotMatch(page.raw, /fonts\.googleapis|fonts\.gstatic/);
+    assert.match(page.headers['content-security-policy'], /default-src 'self'/);
     assert.strictEqual((page.raw.match(/<script src="app\.js"><\/script>/g) || []).length, 1);
 
     const traversal = await request(port, 'GET', '/..%2Fpackage.json', null);
@@ -124,24 +145,39 @@ async function main() {
     const unknownGame = await request(port, 'POST', '/api/create', { game: 'not-a-game' });
     assert.strictEqual(unknownGame.status, 400);
 
+    const oversized = await request(port, 'POST', '/api/create', { padding: 'x'.repeat(70 * 1024) });
+    assert.strictEqual(oversized.status, 413);
+
     const created = await request(port, 'POST', '/api/create', { game: 'battleship', name: 'Alpha' });
     assert.strictEqual(created.status, 200);
     assert.strictEqual(created.data.you, 'A');
     assert.match(created.data.room, /^[A-Z2-9]{4}$/);
+    await delay(350);
+    const firstSave = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
+    assert.strictEqual(firstSave.rooms[created.data.room].players.A.name, 'Alpha');
+    assert.strictEqual(firstSave.rooms.OLDD, undefined);
 
     const joined = await request(port, 'POST', '/api/join', { room: created.data.room, name: 'Bravo' });
     assert.strictEqual(joined.status, 200);
     assert.strictEqual(joined.data.you, 'B');
+    await delay(350);
+    assert.strictEqual(JSON.parse(fs.readFileSync(dataFile, 'utf8')).rooms[created.data.room].players.B.name, 'Bravo');
 
-    const stateA = await request(port, 'GET', `/api/state?room=${created.data.room}&token=${created.data.token}`, null);
+    const stateWithoutToken = await request(port, 'GET', `/api/state?room=${created.data.room}`, null);
+    assert.strictEqual(stateWithoutToken.status, 403);
+
+    const stateA = await request(port, 'GET', `/api/state?room=${created.data.room}`, null, {
+      Authorization: `Bearer ${created.data.token}`,
+    });
     assert.strictEqual(stateA.status, 200);
     assert.strictEqual(stateA.data.opponentJoined, true);
     assert.strictEqual(stateA.data.view.phase, 'placing');
 
     const setupA = await request(port, 'POST', '/api/setup', {
       room: created.data.room,
-      token: created.data.token,
       ships: fleet(),
+    }, {
+      Authorization: `Bearer ${created.data.token}`,
     });
     assert.strictEqual(setupA.status, 200);
 
@@ -152,7 +188,9 @@ async function main() {
     });
     assert.strictEqual(setupB.status, 200);
 
-    const afterSetup = await request(port, 'GET', `/api/state?room=${created.data.room}&token=${created.data.token}`, null);
+    const afterSetup = await request(port, 'GET', `/api/state?room=${created.data.room}`, null, {
+      Authorization: `Bearer ${created.data.token}`,
+    });
     assert.strictEqual(afterSetup.status, 200);
     assert.strictEqual(afterSetup.data.view.phase, 'battle');
     assert.match(afterSetup.data.view.turn, /^[AB]$/);
@@ -160,8 +198,9 @@ async function main() {
     const shooter = afterSetup.data.view.turn === 'A' ? created.data : joined.data;
     const move = await request(port, 'POST', '/api/move', {
       room: created.data.room,
-      token: shooter.token,
       move: { r: 0, c: 0 },
+    }, {
+      Authorization: `Bearer ${shooter.token}`,
     });
     assert.strictEqual(move.status, 200);
 
@@ -172,7 +211,9 @@ async function main() {
     const connectJoined = await request(port, 'POST', '/api/join', { room: connectCreated.data.room, name: 'Gold' });
     assert.strictEqual(connectJoined.status, 200);
 
-    const connectState = await request(port, 'GET', `/api/state?room=${connectCreated.data.room}&token=${connectCreated.data.token}`, null);
+    const connectState = await request(port, 'GET', `/api/state?room=${connectCreated.data.room}`, null, {
+      Authorization: `Bearer ${connectCreated.data.token}`,
+    });
     assert.strictEqual(connectState.status, 200);
     assert.strictEqual(connectState.data.view.ui, 'connectfour');
     assert.strictEqual(connectState.data.view.phase, 'battle');
@@ -198,7 +239,9 @@ async function main() {
     assert.strictEqual(oneJoinC.status, 200);
     assert.strictEqual(oneJoinC.data.you, 'C');
 
-    const oneLobby = await request(port, 'GET', `/api/state?room=${oneCreated.data.room}&token=${oneCreated.data.token}`, null);
+    const oneLobby = await request(port, 'GET', `/api/state?room=${oneCreated.data.room}`, null, {
+      Authorization: `Bearer ${oneCreated.data.token}`,
+    });
     assert.strictEqual(oneLobby.status, 200);
     assert.strictEqual(oneLobby.data.view.ui, 'onecard');
     assert.strictEqual(oneLobby.data.view.phase, 'lobby');
@@ -212,7 +255,9 @@ async function main() {
     });
     assert.strictEqual(oneStart.status, 200);
 
-    const oneState = await request(port, 'GET', `/api/state?room=${oneCreated.data.room}&token=${oneCreated.data.token}`, null);
+    const oneState = await request(port, 'GET', `/api/state?room=${oneCreated.data.room}`, null, {
+      Authorization: `Bearer ${oneCreated.data.token}`,
+    });
     assert.strictEqual(oneState.status, 200);
     assert.strictEqual(oneState.data.view.phase, 'battle');
     assert.strictEqual(oneState.data.view.hand.length, 7);
@@ -226,6 +271,7 @@ async function main() {
   } finally {
     child.kill();
     try { fs.unlinkSync(dataFile); } catch {}
+    try { fs.unlinkSync(`${dataFile}.tmp`); } catch {}
   }
 }
 

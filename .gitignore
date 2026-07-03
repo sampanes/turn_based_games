@@ -1,5 +1,7 @@
 # Runtime game state
 data.json
+data.json.tmp
+backups/
 couch-armada/data.json
 *.sqlite
 *.sqlite3

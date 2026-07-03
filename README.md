@@ -1,56 +1,152 @@
 # Turn-Based Games
 
-Turn-Based Games is a small collection of browser-friendly turn-based games with two deployment modes:
+A small collection of browser-friendly turn-based games with two deployment modes:
 
-- **Static player-vs-computer mode** for GitHub Pages. The repository root is a landing page, and the playable client lives in `public/`.
-- **Live room-code multiplayer mode** for a Node server. The server uses the same shared game-rule modules from `public/games/` so solo and multiplayer rules stay aligned.
+- Static player-vs-computer mode for GitHub Pages.
+- Private room-code multiplayer through a local Node server.
 
-There are no runtime npm dependencies.
+The project has no runtime npm dependencies. Multiplayer is designed to stay bound to
+localhost and be shared privately through a network layer such as Tailscale Serve.
 
-## Play On GitHub Pages
+## Games
 
-Publish this repository from the default branch root. The root `index.html` is the GitHub Pages landing page for player-vs-computer games and links into the static client under `public/`.
+- Battleship
+- Connect Four
+- Mancala
+- Ultimate Tic-Tac-Toe
+- UNO-style One Card for two to four players
 
-Static solo links use query parameters such as:
+## Static Solo Play
+
+Publish the repository from the default branch root with GitHub Pages. The repository
+root is a landing page and the playable static client lives under `public/`.
+
+Example launch paths:
 
 ```text
 public/?mode=computer&game=battleship
 public/?mode=computer&game=connectfour
-public/?mode=computer&game=onecard
+public/?mode=computer&game=mancala
 ```
 
-The static client stores solo rooms in browser `localStorage`, so it does not need a server.
-live here:
-[https://sampanes.github.io/turn_based_games/]
+Solo rooms live only in browser `localStorage`; no server or shared database is used.
+The deployment URL is available from the repository's Pages settings after publishing.
 
-> Note: GitHub Pages project URLs use the repository name exactly. If the repository is named `turn_based_games`, the project URL contains `/turn_based_games/`, not `/turn-based-games/`.
+## Local Multiplayer
 
-## Run Locally With Multiplayer
+Node 16 or newer is required.
 
-Turn-Based Games requires Node 16+.
+On Windows, use the named helpers:
+
+```text
+start-turn-based-games.bat
+status-turn-based-games.bat
+stop-turn-based-games.bat
+```
+
+The server console is titled `turn-based-games`, matching the package and helper names.
+The older `start-server.bat` and `stop-server.bat` files remain as compatibility wrappers.
+
+The server listens only on:
+
+```text
+http://127.0.0.1:8080/
+```
+
+It does not listen on the LAN or public internet by default.
+
+For other platforms:
 
 ```bash
 npm start
 ```
 
-By default, the server listens on all interfaces on port 8080:
+## Private Remote Multiplayer With Tailscale
+
+The intended private path is:
 
 ```text
-Turn-Based Games running at http://0.0.0.0:8080
-LAN clients can open http://<server-ip>:8080
+player browser -> private tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:8080
 ```
 
-To test on a local network, find the host IP address and open `http://<server-ip>:8080` from another device on the same network. One player starts a game and shares the 4-character room code; other players join with that code. Most games are two-player, while UNO supports up to four players before the host starts the hand.
+One-time preparation:
 
-The port can be changed with:
+1. Install Tailscale and sign in on the game host.
+2. Give the host a generic, non-personal machine name before enabling HTTPS.
+3. Start the local game server.
+4. Run `enable-private-share.bat`, using an Administrator console if requested.
+5. Inspect the private URL with `status-turn-based-games.bat`.
+6. Share only the game-host machine with each intended player.
+7. Restrict shared users to the HTTPS game service in the tailnet access policy.
 
-```bash
-PORT=3000 node server.js
+Each person should use a separate Tailscale account. Sharing a single host is narrower
+than inviting someone into the entire tailnet. Keep recipient identities and access
+rules in the Tailscale admin console rather than committing them to this repository.
+
+`enable-private-share.bat` uses Tailscale Serve, not Tailscale Funnel. Do not enable
+Funnel, forward port 8080 on a router, or add a public firewall rule for this service.
+
+Tailscale Serve configuration can remain in place while the Node backend is stopped.
+The private URL will become usable again the next time the named server is started.
+
+## Multiplayer Behavior
+
+A player creates a room and shares its four-character code with another permitted
+player. Most games are two-player; One Card supports up to four players before the
+host starts the hand.
+
+Clients poll automatically once per second. The player making a move sees the result
+immediately, while other players normally see it within one second without refreshing.
+Mancala animates each pickup and drop and generates quiet browser-native sounds without
+downloading audio assets.
+
+## Persistent State
+
+Multiplayer state is stored in `data.json` beside `server.js` by default. It contains
+room state, display names, and secret player tokens, so it must remain private.
+
+`data.json`, temporary writes, and the `backups/` directory are excluded from Git.
+Create a local timestamped backup with:
+
+```text
+backup-turn-based-games.bat
 ```
+
+Deleting `data.json` removes every multiplayer room. Set `DATA_FILE` to an absolute
+path outside the checkout if runtime state should live elsewhere.
+
+## Security Defaults
+
+- The backend binds to `127.0.0.1`, not all network interfaces.
+- Authenticated requests use a bearer token instead of putting tokens in URLs.
+- Static responses include browser security headers.
+- Browser assets are local; the client does not fetch third-party fonts or analytics.
+- Request bodies are limited to 64 KiB.
+- API traffic is limited to 900 requests per identity per minute.
+- At most 200 rooms are retained by default.
+- Rooms expire after 90 days without a join, setup, or move.
+- Writes use a temporary file and rename to reduce partial-file corruption.
+
+These controls are defense in depth. The private Tailscale access boundary is still
+required; the application is not intended to be exposed directly to the public internet.
+
+Configuration can be adjusted with environment variables:
+
+| Variable | Default | Purpose |
+| --- | ---: | --- |
+| `HOST` | `127.0.0.1` | Listener address |
+| `PORT` | `8080` | Local HTTP port |
+| `DATA_FILE` | `./data.json` | Multiplayer state path |
+| `MAX_BODY_BYTES` | `65536` | Maximum API request body |
+| `RATE_LIMIT_PER_MINUTE` | `900` | API requests per identity |
+| `MAX_ROOMS` | `200` | Retained multiplayer rooms |
+| `ROOM_TTL_DAYS` | `90` | Inactive room lifetime |
 
 ## Test
 
-The smoke test starts the server on a temporary local port and exercises the main Battleship API flow, Connect Four room creation and move handling, and the multiplayer UNO lobby/start flow.
+The smoke test starts an isolated localhost server on a temporary port and exercises
+static serving, traversal protection, request-size limits, bearer authentication,
+Battleship setup and moves, Connect Four, Mancala move identity, and the One Card lobby.
 
 ```bash
 npm test
@@ -59,85 +155,33 @@ npm test
 ## Project Layout
 
 ```text
-index.html             GitHub Pages landing page for static solo play
-404.html               GitHub Pages fallback that returns to the static landing page
-package.json           Node scripts for the live multiplayer server and smoke test
-server.js              shared HTTP server, API, rooms, persistence
+index.html                       GitHub Pages landing page
+404.html                         GitHub Pages fallback
+server.js                        local HTTP server, rooms, limits, and persistence
 public/
-  index.html           mobile-first game client for computer and live server modes
-  app.js               shared browser controller for sessions, polling, launch params, and UI state
-  solo.js              GitHub Pages/localStorage API adapter for computer play
-  games/
-    registry.js        browser game catalog for static pages
-    battleship.js      shared Battleship rules used by browser and server
-    connectfour.js     shared Connect Four rules and basic computer opponent
-    onecard.js         shared UNO rules for 2-4 players and solo bots
-  manifest.json        mobile web app metadata
-server/
-  games/               Node wrappers that expose the shared browser rules to server.js
-test/
-  smoke.js             zero-dependency HTTP smoke test
+  index.html                     mobile-first game client
+  app.js                         sessions, polling, animation, sound, and UI state
+  solo.js                        browser-local computer-play adapter
+  games/                         shared browser and server game rules
+server/games/                    Node wrappers for shared rules
+test/smoke.js                    zero-dependency server smoke test
+start-turn-based-games.bat       named Windows launcher
+status-turn-based-games.bat      process, listener, and private-share status
+stop-turn-based-games.bat        named Windows stop helper
+enable-private-share.bat         tailnet-only Tailscale Serve setup
+backup-turn-based-games.bat      local state backup helper
 ```
-
-## Run As A Service
-
-For a Linux host using systemd, create `/etc/systemd/system/turn-based-games.service`:
-
-```ini
-[Unit]
-Description=Turn-Based Games
-After=network.target
-
-[Service]
-ExecStart=/usr/bin/node /opt/turn-based-games/server.js
-WorkingDirectory=/opt/turn-based-games
-Restart=always
-User=games
-Environment=PORT=8080
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Adjust `ExecStart`, `WorkingDirectory`, and `User` for the deployment target. Then enable the service:
-
-```bash
-sudo systemctl enable --now turn-based-games
-sudo systemctl status turn-based-games
-journalctl -u turn-based-games -f
-```
-
-## Remote Access For Multiplayer
-
-Remote play requires a reachable HTTPS URL or private network path to the host. Common options include Cloudflare Tunnel, Tailscale, or a carefully configured port forward plus dynamic DNS.
-
-## Static Solo Architecture
-
-Solo mode deliberately calls the same game hooks as the HTTP server:
-
-- `init()` creates the room state.
-- `validateSetup()` validates and commits setup when a game has setup.
-- `applyMove()` applies both human and computer turns.
-- `viewFor()` renders the player-specific board.
-- Optional `computerSetup()`, `computerPlayers()`, and `computerMove()` hooks let static solo mode seat bots, set them up, and take basic opponent turns without duplicating rule logic.
-
-That keeps turn order, hidden information, win conditions, and move validation aligned with live multiplayer instead of copying game rules into the client.
 
 ## Adding Games
 
-The server keeps room, turn, identity, and persistence plumbing separate from game rules. A shared game module in `public/games/` exports these hooks in a browser and Node-compatible format:
+The server keeps room, identity, persistence, and transport code separate from game
+rules. A shared module under `public/games/` exposes:
 
 - `init()`
 - `validateSetup(state, player, setup)`
 - `applyMove(state, player, move, players)`
 - `viewFor(state, player, players)`
 
-The `public/games/battleship.js` module is the reference implementation. Add another game by creating a module in `public/games/`, giving it metadata, and registering it through `public/games/registry.js` for static play. Register the same module for the server in `server/games/index.js`, add a `<script>` tag in `public/index.html`, and add or map the matching mobile-first UI. Expose `computerSetup()` and `computerMove()` when the game supports GitHub Pages solo play so `public/solo.js` can remain generic while each game owns its own basic opponent behavior.
-
-## Notes
-
-- Battleship uses one shot per turn with strict alternation.
-- Connect Four uses standard 7-column, 6-row gravity drops and detects horizontal, vertical, and diagonal fours.
-- UNO is a shedding game for 2-4 server players; static solo play seats the human against three first-legal-card computer players.
-- To reset local multiplayer state, stop the server, delete `data.json`, and start it again.
-- To reset static solo state, clear the browser's local storage for the site.
+Optional computer-play hooks include `computerSetup()`, `computerPlayers()`, and
+`computerMove()`. Register a new module in both `public/games/registry.js` and
+`server/games/index.js`, add its browser script, and provide the matching UI.

@@ -108,12 +108,18 @@ function populateGameSelect() {
   }
 }
 function soloApi(path, method, body) {
-  return window.TurnBasedGamesSolo.handle(path, method, body, session, { gameMeta, selectedGameId });
+  const payload = { ...(body || {}) };
+  if (session && session.token && !payload.token) payload.token = session.token;
+  return window.TurnBasedGamesSolo.handle(path, method, payload, session, { gameMeta, selectedGameId });
 }
 
 async function api(path, method, body) {
   if (session && session.mode === 'computer') return soloApi(path, method, body || {});
-  const opt = { method, headers: { 'Content-Type': 'application/json' } };
+  const headers = { 'Content-Type': 'application/json' };
+  if (session && session.mode === 'online' && session.token) {
+    headers.Authorization = `Bearer ${session.token}`;
+  }
+  const opt = { method, headers };
   if (body) opt.body = JSON.stringify(body);
   const res = await fetch(path, opt);
   const data = await res.json().catch(() => ({}));
@@ -193,13 +199,13 @@ function updateSoloRestartButtons() {
 }
 
 
-function startPoll() { stopPoll(); pollTimer = setInterval(poll, 3000); }
+function startPoll() { stopPoll(); pollTimer = setInterval(poll, 1000); }
 function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
 
 async function poll() {
   if (!session) return;
   try {
-    const d = await api(`/api/state?room=${session.room}&token=${session.token}`, 'GET');
+    const d = await api(`/api/state?room=${encodeURIComponent(session.room)}`, 'GET');
     render(d);
   } catch (e) {
     if (/No such game|Not in this game/.test(e.message)) { clearSession(); stopPoll(); show('home'); }
@@ -566,7 +572,7 @@ function randomize() {
 
 async function submitFleet() {
   try {
-    await api('/api/setup', 'POST', { room: session.room, token: session.token, ships: placedShips });
+    await api('/api/setup', 'POST', { room: session.room, ships: placedShips });
     poll();
   } catch (e) { toast(e.message); }
 }
@@ -724,7 +730,7 @@ async function fire(r, c) {
   const cell = document.querySelector(`#fireGrid .cell[data-r="${r}"][data-c="${c}"]`);
   if (cell) { cell.classList.add('ripple'); setTimeout(() => cell.classList.remove('ripple'), 500); }
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { r, c } });
+    await api('/api/move', 'POST', { room: session.room, move: { r, c } });
     poll();
   } catch (e) { toast(e.message); }
 }
@@ -788,7 +794,7 @@ async function dropConnectDisc(c) {
   if (!lastView || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
   if (!lastView.legalMoves.includes(c)) { toast('That column is full.'); return; }
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { c } });
+    await api('/api/move', 'POST', { room: session.room, move: { c } });
     poll();
   } catch (e) { toast(e.message); }
 }
@@ -1037,7 +1043,7 @@ function chooseWildColor() {
 }
 async function startOneCard() {
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { action: 'start' } });
+    await api('/api/move', 'POST', { room: session.room, move: { action: 'start' } });
     poll();
   } catch (e) { toast(e.message); }
 }
@@ -1046,14 +1052,14 @@ async function playOneCard(card) {
   const move = { action: 'play', cardId: card.id };
   if (card.color === 'wild') move.color = chooseWildColor();
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move });
+    await api('/api/move', 'POST', { room: session.room, move });
     poll();
   } catch (e) { toast(e.message); }
 }
 async function drawOneCard() {
   if (!lastView || lastView.ui !== 'onecard' || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { action: 'draw' } });
+    await api('/api/move', 'POST', { room: session.room, move: { action: 'draw' } });
     poll();
   } catch (e) { toast(e.message); }
 }
@@ -1062,6 +1068,40 @@ async function drawOneCard() {
 let mncAnimating = false;
 let mncLastPits = null;
 let mncLastMoveTag = null;
+let mncAudioContext = null;
+
+function mncEnsureAudio() {
+  if (!mncAudioContext) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+    mncAudioContext = new AudioContext();
+  }
+  if (mncAudioContext.state === 'suspended') mncAudioContext.resume().catch(() => {});
+  return mncAudioContext;
+}
+
+function mncSound(kind, variation = 0) {
+  const audio = mncEnsureAudio();
+  if (!audio || audio.state !== 'running') return;
+  const now = audio.currentTime;
+  const oscillator = audio.createOscillator();
+  const gain = audio.createGain();
+  const tones = {
+    pickup: 150,
+    sow: 380 + (variation % 5) * 24,
+    capture: 220,
+    bonus: 620,
+  };
+  oscillator.type = kind === 'sow' ? 'triangle' : 'sine';
+  oscillator.frequency.setValueAtTime(tones[kind] || 320, now);
+  if (kind === 'capture') oscillator.frequency.exponentialRampToValueAtTime(110, now + 0.11);
+  gain.gain.setValueAtTime(kind === 'sow' ? 0.035 : 0.045, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + (kind === 'sow' ? 0.055 : 0.12));
+  oscillator.connect(gain);
+  gain.connect(audio.destination);
+  oscillator.start(now);
+  oscillator.stop(now + 0.13);
+}
 
 function mncDotsHTML(count) {
   if (!count || count > 5) return '';
@@ -1222,6 +1262,7 @@ function mncAnimateMove(v, prevPits) {
     }
     const frame = frames[i];
     if (frame.type === 'pickup') {
+      mncSound('pickup');
       const source = document.getElementById(`mnc-p${frame.pit}`);
       if (source) {
         source.classList.remove('pickup');
@@ -1229,9 +1270,13 @@ function mncAnimateMove(v, prevPits) {
         source.classList.add('pickup');
       }
     }
-    if (frame.type === 'sow') mncFlySeed(movePickup, frame.pit, v.myPitIndices.includes(movePickup) || movePickup === v.myStoreIndex ? 'mine' : 'opp');
+    if (frame.type === 'sow') {
+      mncFlySeed(movePickup, frame.pit, v.myPitIndices.includes(movePickup) || movePickup === v.myStoreIndex ? 'mine' : 'opp');
+      mncSound('sow', i);
+    }
     mncUpdatePit(frame.pit, frame.count, v);
     if (frame.type === 'sow') mncBounce(frame.pit);
+    if (frame.type === 'capture-store') mncSound('capture');
     if (frame.type === 'capture-store') {
       const storeEl = document.getElementById(`mnc-p${myStoreIndex}`);
       if (storeEl) {
@@ -1241,6 +1286,7 @@ function mncAnimateMove(v, prevPits) {
       }
     }
     if (frame.type === 'extraturn') {
+      mncSound('bonus');
       const storeEl = document.getElementById(`mnc-p${myStoreIndex}`);
       if (storeEl) {
         storeEl.classList.remove('extraturn-anim');
@@ -1259,7 +1305,7 @@ function renderMancala(d, v) {
   if (!board) return;
 
   const moveTag = v.moveSeq && v.moveSeq.length > 0
-    ? `${v.movePickup}:${v.moveSeq.join(',')}` : '';
+    ? `${v.moveNumber || 0}:${v.movePickup}:${v.moveSeq.join(',')}` : '';
   const hasNewMove = moveTag && moveTag !== mncLastMoveTag && !!mncLastPits;
   const pitsChanged = mncLastPits && v.pits.some((p, i) => p !== mncLastPits[i]);
 
@@ -1274,7 +1320,7 @@ function renderMancala(d, v) {
     mncLastPits = v.pits.slice();
   }
 
-  mncLastMoveTag = moveTag || mncLastMoveTag;
+  if (!mncAnimating) mncLastMoveTag = moveTag || mncLastMoveTag;
 
   const myScore  = v.pits[v.myStoreIndex];
   const oppScore = v.pits[v.oppStoreIndex];
@@ -1310,7 +1356,8 @@ async function moveMancala(pitIdx) {
   if (!lastView.validMoves.includes(pitIdx)) { toast('That pit is empty.'); return; }
 
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { pit: pitIdx } });
+    mncEnsureAudio();
+    await api('/api/move', 'POST', { room: session.room, move: { pit: pitIdx } });
     poll();
   } catch (e) { toast(e.message); }
 }
@@ -1392,13 +1439,14 @@ function renderUltimateTTT(d, v) {
 async function moveUltimateTTT(idx) {
   if (!lastView || lastView.phase !== 'battle' || !lastView.isMyTurn) { toast('Not your turn.'); return; }
   try {
-    await api('/api/move', 'POST', { room: session.room, token: session.token, move: { idx } });
+    await api('/api/move', 'POST', { room: session.room, move: { idx } });
     poll();
   } catch (e) { toast(e.message); }
 }
 
 // ---------------- boot ----------------
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+document.addEventListener('pointerdown', mncEnsureAudio, { once: true });
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 $('gameSelect').addEventListener('change', () => applyDeviceClasses('home'));
 window.addEventListener('resize', () => {
