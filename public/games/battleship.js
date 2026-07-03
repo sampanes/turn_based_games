@@ -177,6 +177,18 @@ const battleship = {
       firingBoard.push(row);
     }
 
+    const over = state.phase === 'over';
+    const myFleet = me.ships
+      ? me.ships.map(s => ({ name: s.name, size: s.size, hits: s.hits, sunk: s.hits >= s.size, cells: s.cells }))
+      : FLEET.map(s => ({ name: s.name, size: s.size, hits: 0, sunk: false, cells: [] }));
+    // Enemy ship positions stay hidden until a ship is sunk (or the game ends).
+    const enemyFleet = enemy.ships
+      ? enemy.ships.map(s => {
+          const sunk = s.hits >= s.size;
+          return { name: s.name, size: s.size, sunk, cells: (sunk || over) ? s.cells : null };
+        })
+      : FLEET.map(s => ({ name: s.name, size: s.size, sunk: false, cells: null }));
+
     return {
       phase: state.phase,
       turn: state.turn,
@@ -187,6 +199,8 @@ const battleship = {
       size: SIZE,
       myBoard,
       firingBoard,
+      myFleet,
+      enemyFleet,
       myShipsLeft: me.ships ? me.ships.filter(s => s.hits < s.size).length : FLEET.length,
       enemyShipsLeft: enemy.ships ? enemy.ships.filter(s => s.hits < s.size).length : FLEET.length,
       lastShot: state.lastShot,

@@ -104,9 +104,6 @@
   .status.lose { background: rgba(255,91,81,.12); border-color: var(--fire); color: var(--fire); font-weight: 700; }
 
   /* grids */
-  .board-label { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 8px; }
-  .board-label h3 { margin: 0; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
-  .board-label .left { font-size: 11px; color: var(--mute); letter-spacing: 1px; }
   .grid {
     position: relative;
     display: grid; grid-template-columns: repeat(10, 1fr); gap: var(--grid-gap);
@@ -170,6 +167,98 @@
   .pip { width: 11px; height: 11px; border-radius: 2px; background: #2c5a6b; }
   .ship-row.done .pip { background: var(--sonar-dim); }
   .check { color: var(--sonar); font-size: 14px; }
+
+  /* battleship battle screen: fixed full-viewport, 3D scene, pinned dock */
+  body.battle-mode { overflow: hidden; }
+  #battle.battle-screen {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: calc(env(safe-area-inset-top) + 8px) max(10px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 10px) max(10px, env(safe-area-inset-left));
+    background:
+      radial-gradient(120% 80% at 50% -10%, #0e2c3a 0%, var(--abyss) 60%),
+      var(--abyss);
+    overflow: hidden;
+  }
+  #battle .status { margin-top: 0; position: static; }
+  .battle-scene { position: relative; flex: 1; min-height: 0; perspective: 1050px; }
+  .board-plane {
+    position: absolute; left: 0; right: 0;
+    display: flex; flex-direction: column; min-height: 0;
+    transition: top .55s cubic-bezier(.3,.8,.3,1), height .55s cubic-bezier(.3,.8,.3,1),
+                transform .55s cubic-bezier(.3,.8,.3,1), opacity .4s ease;
+    will-change: transform;
+  }
+  #firePlane { transform-origin: 50% 6%; }
+  #myPlane { transform-origin: 50% 96%; }
+  .battle-scene.focus-fire #firePlane { top: 0; height: 72%; transform: rotateX(0deg); z-index: 2; }
+  .battle-scene.focus-fire #myPlane { top: 74%; height: 26%; transform: rotateX(-40deg) scale(.97); opacity: .88; z-index: 1; cursor: pointer; }
+  .battle-scene.focus-mine #firePlane { top: 0; height: 26%; transform: rotateX(40deg) scale(.97); opacity: .88; z-index: 1; cursor: pointer; }
+  .battle-scene.focus-mine #myPlane { top: 28%; height: 72%; transform: rotateX(0deg); z-index: 2; }
+  .plane-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 2px 2px 5px; flex: none; }
+  .plane-head h3 { margin: 0; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+  .plane-head h3.enemy { color: var(--fire); }
+  .plane-head h3.mine { color: var(--sonar); }
+  .plane-grid { flex: 1; min-height: 0; container-type: size; display: flex; align-items: center; justify-content: center; }
+  .battle-scene .plane-grid .grid { width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); }
+
+  /* fleet tracker strips */
+  .fleet-strip { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; min-height: 15px; }
+  .fs-ship { display: flex; gap: 2px; align-items: center; padding: 3px 4px; border: 1px solid var(--line); border-radius: 5px; background: rgba(6,20,27,.6); transition: opacity .3s ease; }
+  .fs-pip { width: 7px; height: 7px; border-radius: 2px; background: #2c5a6b; }
+  .fs-pip.hit { background: var(--fire); box-shadow: 0 0 6px rgba(255,91,81,.55); }
+  .fs-ship.sunk { opacity: .4; border-color: rgba(255,91,81,.6); }
+  .fs-ship.sunk .fs-pip { background: var(--fire); box-shadow: none; }
+
+  /* bottom dock */
+  .battle-dock { display: flex; gap: 8px; align-items: stretch; flex: none; }
+  .battle-dock .fire-btn { flex: 2.2; font-size: 17px; font-weight: 800; letter-spacing: 2px; min-height: 56px; }
+  .battle-dock .fire-btn:disabled { letter-spacing: 1px; }
+  .battle-dock .dock-small { flex: 1; font-size: 12px; letter-spacing: .5px; padding: 8px 4px; min-height: 56px; }
+
+  /* player crosshair (green variant of battle-aim) */
+  .battle-aim.player { border-color: var(--sonar); filter: drop-shadow(0 0 8px rgba(52,231,196,.9)); transition: transform .14s cubic-bezier(.2,.8,.2,1), width .14s ease, height .14s ease; }
+  .battle-aim.player::before, .battle-aim.player::after { background: var(--sonar); box-shadow: 0 0 8px rgba(52,231,196,.7); }
+
+  /* shot effects */
+  .shell-tracer {
+    position: absolute; z-index: 6; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+    border-radius: 50%; background: #fff; pointer-events: none;
+    box-shadow: 0 0 14px rgba(52,231,196,.95), 0 0 5px #fff;
+    transition: left .38s cubic-bezier(.3,.1,.6,1), top .38s cubic-bezier(.3,.1,.6,1);
+  }
+  .cell.boom::before {
+    content: ""; position: absolute; inset: 0; z-index: 2; border-radius: 50%; pointer-events: none;
+    background: radial-gradient(circle, #fff 0%, var(--amber) 35%, rgba(255,91,81,0) 70%);
+    animation: cellBoom .5s ease-out both;
+  }
+  @keyframes cellBoom { 0% { transform: scale(.2); opacity: 1; } 100% { transform: scale(2.4); opacity: 0; } }
+  .cell.splash::before {
+    content: ""; position: absolute; inset: 0; z-index: 2; border-radius: 50%; pointer-events: none;
+    border: 2px solid rgba(207,233,236,.85);
+    animation: cellSplash .55s ease-out both;
+  }
+  @keyframes cellSplash { 0% { transform: scale(.2); opacity: .9; } 100% { transform: scale(2); opacity: 0; } }
+  .grid.shake { animation: gridShake .55s ease; }
+  @keyframes gridShake {
+    0%, 100% { translate: 0 0; }
+    18% { translate: -5px 2px; } 36% { translate: 5px -3px; }
+    54% { translate: -4px -2px; } 72% { translate: 3px 2px; } 88% { translate: -2px 1px; }
+  }
+  .cell.sink-pop { animation: sinkPop .8s ease both; }
+  @keyframes sinkPop { 0% { transform: scale(1); } 30% { transform: scale(1.25); filter: brightness(2.2); } 100% { transform: scale(1); filter: brightness(.8); } }
+  .cell.sunk-ship { filter: saturate(.5) brightness(.72); box-shadow: inset 0 0 0 2px rgba(142,22,34,.85); }
+  .cell.reveal-ship { background: rgba(44,90,107,.45); box-shadow: inset 0 0 0 1px rgba(60,122,144,.7); }
+
+  /* wide screens / landscape: boards side by side, no tilt */
+  @media (min-aspect-ratio: 6/5) {
+    .battle-scene { display: flex; gap: 14px; }
+    .battle-scene .board-plane {
+      position: static !important; height: auto !important; flex: 1;
+      transform: none !important; opacity: 1 !important; cursor: default !important;
+    }
+    #battle.battle-screen { padding-left: max(18px, env(safe-area-inset-left)); padding-right: max(18px, env(safe-area-inset-right)); }
+    .battle-dock { max-width: 720px; width: 100%; margin: 0 auto; }
+  }
 
   .toast {
     position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
@@ -469,10 +558,8 @@
   body.is-phone button { font-size: 15px; font-weight: 600; }
   body.is-phone .row { flex-direction: column; }
   body.is-phone .status { position: sticky; top: env(safe-area-inset-top); z-index: 5; padding: 14px 12px; }
-  body.is-phone .board-label { margin-top: 14px; }
   body.is-phone .grid { width: min(100%, calc(100dvh - 210px)); border-width: 1px; }
-  body.is-phone #battle .grid, body.is-phone #placement .grid { max-width: 430px; }
-  body.is-phone #battle .grid + .board-label { margin-top: 20px; }
+  body.is-phone #placement .grid { max-width: 430px; }
   body.is-phone .cell { border-radius: 3px; }
   body.is-phone .ship-row { min-height: 54px; }
   body.is-phone .connect-stage { padding: 8px; margin-inline: -4px; }
@@ -543,10 +630,6 @@
     body { --page-pad: 24px; }
     .wrap { max-width: 1040px; }
     .card { padding: 22px; }
-    #battle.card { display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; align-items: start; }
-    #battle #statusBanner, #battle .ghost { grid-column: 1 / -1; }
-    #battle .board-label { margin-top: 18px; }
-    #battle .grid { width: 100%; }
     .connect-panel, .one-card-panel, #placement.card, #home.card, #lobby.card { max-width: 620px; margin-left: auto; margin-right: auto; }
     .one-card-hand { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   }
@@ -559,10 +642,8 @@
   @media (orientation: landscape) and (max-height: 520px) {
     body.is-phone header { display: none; }
     body.is-phone .card { margin-top: 8px; }
-    body.is-phone #placement.card, body.is-phone #battle.card, body.is-phone #connectFour.card { max-width: none; }
-    body.is-phone .grid { width: min(42vw, calc(100dvh - 86px)); }
-    body.is-phone #battle.card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
-    body.is-phone #battle #statusBanner, body.is-phone #battle .ghost { grid-column: 1 / -1; }
+    body.is-phone #placement.card, body.is-phone #connectFour.card { max-width: none; }
+    body.is-phone #placement .grid { width: min(42vw, calc(100dvh - 86px)); }
     body.is-phone .connect-stage { max-width: min(82vw, 680px); margin-left: auto; margin-right: auto; }
   }
 
@@ -623,22 +704,30 @@
   </section>
 
   <!-- BATTLE -->
-  <section id="battle" class="card hidden">
-    <div class="orientation-note portrait-recommended">Portrait is recommended for Battleship. Rotate only if you want both boards side-by-side.</div>
-    <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
+  <section id="battle" class="battle-screen hidden">
     <div id="statusBanner" class="status">...</div>
-    <div class="board-label">
-      <h3 style="color:var(--fire)">Enemy waters</h3>
-      <span class="left" id="enemyLeft"></span>
+    <div class="battle-scene focus-fire" id="battleScene">
+      <div class="board-plane" id="firePlane">
+        <div class="plane-head">
+          <h3 class="enemy">Enemy waters</h3>
+          <div class="fleet-strip" id="enemyFleetStrip"></div>
+        </div>
+        <div class="plane-grid"><div class="grid fire" id="fireGrid"></div></div>
+      </div>
+      <div class="board-plane" id="myPlane">
+        <div class="plane-head">
+          <h3 class="mine">Your fleet</h3>
+          <div class="fleet-strip" id="myFleetStrip"></div>
+        </div>
+        <div class="plane-grid"><div class="grid" id="myGrid"></div></div>
+      </div>
     </div>
-    <div class="grid fire" id="fireGrid"></div>
-    <div class="board-label">
-      <h3 style="color:var(--sonar)">Your fleet</h3>
-      <span class="left" id="myLeft"></span>
+    <div class="battle-dock">
+      <button id="fireBtn" class="primary fire-btn" onclick="confirmFire()" disabled>FIRE</button>
+      <button id="fxBtn" class="ghost dock-small" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary dock-small solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost dock-small" onclick="leaveGame()">Leave</button>
     </div>
-    <div class="grid" id="myGrid"></div>
-    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
-    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
   </section>
 
 
