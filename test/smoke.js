@@ -60,6 +60,18 @@ function waitForServer(child) {
   });
 }
 
+function waitForExit(child) {
+  if (child.exitCode !== null) return Promise.resolve();
+  return new Promise(resolve => child.once('exit', resolve));
+}
+
+function spawnServer() {
+  return spawn(process.execPath, ['server.js'], {
+    cwd: root,
+    env: { ...process.env, HOST: '', PORT: '0', DATA_FILE: dataFile, BOT_MOVE_DELAY_MS: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
 
 function testUnoTurnSyncAndSorting() {
   const uno = require('../public/games/onecard');
@@ -123,13 +135,8 @@ async function main() {
     },
   }));
 
-  const child = spawn(process.execPath, ['server.js'], {
-    cwd: root,
-    env: { ...process.env, HOST: '', PORT: '0', DATA_FILE: dataFile },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
-
-  const port = await waitForServer(child);
+  let child = spawnServer();
+  let port = await waitForServer(child);
   try {
     const page = await request(port, 'GET', '/', null);
     assert.strictEqual(page.status, 200);
@@ -226,6 +233,57 @@ async function main() {
     });
     assert.strictEqual(connectMove.status, 200);
 
+    const botCreated = await request(port, 'POST', '/api/create', {
+      game: 'connectfour',
+      name: 'Human',
+      bot: true,
+    });
+    assert.strictEqual(botCreated.status, 200);
+    assert.strictEqual(botCreated.data.bot, true);
+
+    const botInitial = await request(port, 'GET', `/api/state?room=${botCreated.data.room}`, null, {
+      Authorization: `Bearer ${botCreated.data.token}`,
+    });
+    assert.strictEqual(botInitial.status, 200);
+    assert.strictEqual(botInitial.data.opponentName, 'Botty');
+    assert.strictEqual(botInitial.data.view.turn, 'A');
+
+    const botJoinDeny = await request(port, 'POST', '/api/join', {
+      room: botCreated.data.room,
+      name: 'Unexpected',
+    });
+    assert.strictEqual(botJoinDeny.status, 409);
+
+    const humanBotMove = await request(port, 'POST', '/api/move', {
+      room: botCreated.data.room,
+      move: { c: 3 },
+    }, {
+      Authorization: `Bearer ${botCreated.data.token}`,
+    });
+    assert.strictEqual(humanBotMove.status, 200);
+    await delay(5);
+
+    const botAfterMove = await request(port, 'GET', `/api/state?room=${botCreated.data.room}`, null, {
+      Authorization: `Bearer ${botCreated.data.token}`,
+    });
+    assert.strictEqual(botAfterMove.status, 200);
+    assert.strictEqual(botAfterMove.data.view.turn, 'A');
+    assert.strictEqual(botAfterMove.data.view.board.flat().filter(Boolean).length, 2);
+
+    for (const game of ['battleship', 'mancala', 'onecard', 'ultimatettt']) {
+      const availableBot = await request(port, 'POST', '/api/create', {
+        game,
+        name: 'Human',
+        bot: true,
+      });
+      assert.strictEqual(availableBot.status, 200);
+      const availableState = await request(port, 'GET', `/api/state?room=${availableBot.data.room}`, null, {
+        Authorization: `Bearer ${availableBot.data.token}`,
+      });
+      assert.strictEqual(availableState.status, 200);
+      assert.strictEqual(availableState.data.opponentJoined, true);
+      assert.strictEqual(availableState.data.opponentName, 'Botty');
+    }
 
     const oneCreated = await request(port, 'POST', '/api/create', { game: 'onecard', name: 'Host' });
     assert.strictEqual(oneCreated.status, 200);
@@ -268,6 +326,24 @@ async function main() {
 
     const badJoin = await request(port, 'POST', '/api/join', { room: created.data.room, name: 'Extra' });
     assert.strictEqual(badJoin.status, 409);
+
+    await delay(350);
+    const savedBotRoom = JSON.parse(fs.readFileSync(dataFile, 'utf8')).rooms[botCreated.data.room];
+    assert.strictEqual(savedBotRoom.botRoom, true);
+    assert.strictEqual(savedBotRoom.players.B.name, 'Botty');
+
+    const expectedBoard = botAfterMove.data.view.board;
+    child.kill();
+    await waitForExit(child);
+    child = spawnServer();
+    port = await waitForServer(child);
+
+    const resumedBot = await request(port, 'GET', `/api/state?room=${botCreated.data.room}`, null, {
+      Authorization: `Bearer ${botCreated.data.token}`,
+    });
+    assert.strictEqual(resumedBot.status, 200);
+    assert.strictEqual(resumedBot.data.opponentName, 'Botty');
+    assert.deepStrictEqual(resumedBot.data.view.board, expectedBoard);
   } finally {
     child.kill();
     try { fs.unlinkSync(dataFile); } catch {}

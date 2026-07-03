@@ -34,6 +34,7 @@ const MAX_ROOMS = envInteger('MAX_ROOMS', 200, 1, 10000);
 const ROOM_TTL_DAYS = envInteger('ROOM_TTL_DAYS', 90, 1, 3650);
 const ROOM_TTL_MS = ROOM_TTL_DAYS * 24 * 60 * 60 * 1000;
 const RATE_LIMIT_PER_MINUTE = envInteger('RATE_LIMIT_PER_MINUTE', 900, 60, 10000);
+const BOT_MOVE_DELAY_MS = envInteger('BOT_MOVE_DELAY_MS', 650, 0, 5000);
 
 // ---------------------------------------------------------------- persistence
 let db = { rooms: {} };
@@ -101,6 +102,61 @@ function notifyJoin(room, slot) {
   if (typeof games[room.game].onPlayerJoined === 'function') games[room.game].onPlayerJoined(room.state, slot);
 }
 
+function isBotTurn(room) {
+  const current = room && room.state && room.state.turn;
+  return !!(room && room.state && room.players && room.state.phase === 'battle'
+    && current && room.players[current] && room.players[current].bot === true);
+}
+
+function scheduleBot(room, now = Date.now()) {
+  if (!isBotTurn(room)) {
+    room.botReadyAt = null;
+    return;
+  }
+  if (!Number.isFinite(room.botReadyAt)) room.botReadyAt = now + BOT_MOVE_DELAY_MS;
+}
+
+function seatBotty(room) {
+  const game = games[room.game];
+  if (!gameMeta(room.game).supportsComputer || typeof game.computerMove !== 'function') {
+    return 'That game does not have a server-side computer player.';
+  }
+  if (!room.players.B) {
+    room.players.B = { name: 'Botty', bot: true };
+    notifyJoin(room, 'B');
+  }
+  if (typeof game.computerSetup === 'function') {
+    const setupError = game.validateSetup(room.state, 'B', game.computerSetup(room.state, 'B'));
+    if (setupError) return setupError;
+  }
+  room.botRoom = true;
+  scheduleBot(room);
+  return null;
+}
+
+function advanceBotIfReady(room, now = Date.now()) {
+  scheduleBot(room, now);
+  if (!isBotTurn(room) || room.botReadyAt > now) return false;
+  const who = room.state.turn;
+  const game = games[room.game];
+  const move = game.computerMove(room.state, who);
+  if (!move) {
+    room.botReadyAt = now + Math.max(BOT_MOVE_DELAY_MS, 1000);
+    return false;
+  }
+  const error = game.applyMove(room.state, who, move, publicPlayers(room));
+  if (error) {
+    console.error(`Botty could not move in ${room.game}: ${error}`);
+    room.botReadyAt = now + Math.max(BOT_MOVE_DELAY_MS, 1000);
+    return false;
+  }
+  room.updatedAt = now;
+  room.botReadyAt = null;
+  scheduleBot(room, now);
+  save();
+  return true;
+}
+
 function cleanName(value, fallback) {
   const name = String(value || '').trim().slice(0, 32);
   return name || fallback;
@@ -154,7 +210,7 @@ function handleApi(req, res, body) {
 
   if (route === '/api/create' && req.method === 'POST') {
     const requested = body.game || 'battleship';
-    if (!games[requested]) return send(res, 400, { error: 'Unknown game.' });
+    if (!Object.prototype.hasOwnProperty.call(games, requested)) return send(res, 400, { error: 'Unknown game.' });
     cleanupRooms();
     if (Object.keys(db.rooms).length >= MAX_ROOMS) {
       return send(res, 503, { error: 'The room limit has been reached. Remove old games or try again later.' });
@@ -169,13 +225,21 @@ function handleApi(req, res, body) {
     };
     db.rooms[code].players.A = { token: tok, name: cleanName(body.name, 'Player 1') };
     notifyJoin(db.rooms[code], 'A');
+    if (body.bot === true) {
+      const botError = seatBotty(db.rooms[code]);
+      if (botError) {
+        delete db.rooms[code];
+        return send(res, 400, { error: botError });
+      }
+    }
     save();
-    return send(res, 200, { room: code, token: tok, you: 'A', game: type });
+    return send(res, 200, { room: code, token: tok, you: 'A', game: type, bot: body.bot === true });
   }
 
   if (route === '/api/join' && req.method === 'POST') {
     const room = db.rooms[cleanRoomCode(body.room)];
     if (!room) return send(res, 404, { error: 'No game with that code.' });
+    if (room.botRoom) return send(res, 409, { error: 'That room is reserved for its player and Botty.' });
     const joined = roomPlayers(room);
     if (joined.length >= maxPlayers(room.game)) return send(res, 409, { error: 'That game is already full.' });
     if (joined.length >= minPlayers(room.game) && room.state && room.state.phase !== 'lobby') return send(res, 409, { error: 'That game already started.' });
@@ -196,6 +260,7 @@ function handleApi(req, res, body) {
     const err = games[room.game].validateSetup(room.state, who, body.ships);
     if (err) return send(res, 400, { error: err });
     room.updatedAt = Date.now();
+    scheduleBot(room);
     save();
     return send(res, 200, { ok: true });
   }
@@ -208,6 +273,7 @@ function handleApi(req, res, body) {
     const err = games[room.game].applyMove(room.state, who, body.move, publicPlayers(room));
     if (err) return send(res, 400, { error: err });
     room.updatedAt = Date.now();
+    scheduleBot(room);
     save();
     return send(res, 200, { ok: true });
   }
@@ -217,6 +283,7 @@ function handleApi(req, res, body) {
     if (!room) return send(res, 404, { error: 'No such game.' });
     const who = playerOf(room, requestToken(req, body));
     if (!who) return send(res, 403, { error: 'Not in this game.' });
+    advanceBotIfReady(room);
     const opp = roomPlayers(room).filter(slot => slot !== who).map(slot => room.players[slot]);
     return send(res, 200, {
       game: room.game,

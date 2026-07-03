@@ -573,7 +573,7 @@
 <div class="wrap">
   <header>
     <h1>TURN-BASED GAMES</h1>
-    <div class="tag">Static solo now - live multiplayer ready</div>
+    <div class="tag">Private multiplayer and persistent Botty games</div>
   </header>
 
   <!-- HOME -->
@@ -584,8 +584,9 @@
     <label for="name1">Your call sign</label>
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
     <button class="primary mt" style="width:100%" onclick="createGame()">Start live multiplayer</button>
-    <button class="mt" style="width:100%" onclick="createComputerGame()">Play vs computer</button>
-    <p class="lede mt">Solo mode runs entirely in this static page for GitHub Pages, but it uses the same rules modules as the server. UNO solo seats you against three simple bots.</p>
+    <button class="mt" style="width:100%" onclick="createBottyGame()">Play Botty - save on server</button>
+    <button class="ghost mt" style="width:100%" onclick="createComputerGame()">Play offline vs computer</button>
+    <p class="lede mt">Botty is always available while the server is running, and the room resumes from server storage. Offline mode stays in this browser and uses the same shared rules.</p>
     <div class="divider">- OR -</div>
     <h2 style="margin-top:6px">Join a game</h2>
     <label for="joinCode">Game code</label>

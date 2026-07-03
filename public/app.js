@@ -135,6 +135,16 @@ async function createGame() {
     enterRoom();
   } catch (e) { toast(e.message); }
 }
+async function createBottyGame() {
+  try {
+    const meta = currentGameMeta();
+    if (meta && meta.supportsComputer === false) return toast('Botty does not support that game yet.');
+    const name = $('name1').value.trim() || 'Player 1';
+    const d = await api('/api/create', 'POST', { game: selectedGameId(), name, bot: true });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online', bot: true });
+    enterRoom();
+  } catch (e) { toast(e.message); }
+}
 async function createComputerGame() {
   try {
     const name = $('name1').value.trim() || 'Player 1';

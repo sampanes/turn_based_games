@@ -4,6 +4,7 @@ A small collection of browser-friendly turn-based games with two deployment mode
 
 - Static player-vs-computer mode for GitHub Pages.
 - Private room-code multiplayer through a local Node server.
+- Persistent server-side games against Botty.
 
 The project has no runtime npm dependencies. Multiplayer is designed to stay bound to
 localhost and be shared privately through a network layer such as Tailscale Serve.
@@ -95,6 +96,12 @@ A player creates a room and shares its four-character code with another permitte
 player. Most games are two-player; One Card supports up to four players before the
 host starts the hand.
 
+`Play Botty - save on server` creates a normal authenticated server room with Botty
+already seated. Botty uses the same shared computer-move hooks as offline play, waits
+briefly before each move so the client can show turn changes, and remains available
+after browser or server restarts. Botty rooms are reserved for their creator and cannot
+be joined by another human.
+
 Clients poll automatically once per second. The player making a move sees the result
 immediately, while other players normally see it within one second without refreshing.
 Mancala animates each pickup and drop and generates quiet browser-native sounds without
@@ -141,12 +148,14 @@ Configuration can be adjusted with environment variables:
 | `RATE_LIMIT_PER_MINUTE` | `900` | API requests per identity |
 | `MAX_ROOMS` | `200` | Retained multiplayer rooms |
 | `ROOM_TTL_DAYS` | `90` | Inactive room lifetime |
+| `BOT_MOVE_DELAY_MS` | `650` | Pause before each server-side Botty move |
 
 ## Test
 
 The smoke test starts an isolated localhost server on a temporary port and exercises
 static serving, traversal protection, request-size limits, bearer authentication,
-Battleship setup and moves, Connect Four, Mancala move identity, and the One Card lobby.
+Battleship setup and moves, Connect Four, Mancala move identity, the One Card lobby,
+Botty availability in every game, and Botty persistence across a server restart.
 
 ```bash
 npm test
