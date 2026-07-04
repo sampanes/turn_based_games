@@ -19,6 +19,7 @@ let battleIncomingHoldUntil = 0; // brief pause between your impact fx and the e
 let battleFxOn = localStorage.getItem('turnBasedGamesFx') !== 'off';
 let placementDrag = null;
 let ignoreNextPlacementClick = false;
+let lastShipTap = null; // { name, time } for double-tap-to-rotate
 let oneCardHandUi = { selectedIndex: 0, selectedCardId: null, raised: false, gesture: null };
 
 // ---- mobile / orientation ergonomics
@@ -309,6 +310,7 @@ function resetGameUi() {
 function resetPlacement() {
   placedShips = [];
   selectedShip = null;
+  lastShipTap = null;
   orient = 'H';
   $('placeGrid').innerHTML = '';
   $('placeGrid').dataset.size = '';
@@ -396,7 +398,7 @@ function occupiedSet(ignoreName) { const s = new Set(); placedShips.filter(p => 
 
 function placeAt(r, c, opts = {}) {
   const existing = !opts.fromDrag && placedShipAt(`${r},${c}`);
-  if (existing) { rotatePlacedShip(existing); return; }
+  if (existing) { tapPlacedShip(existing); return; }
   if (selectedShip == null) return;
   const def = fleetDef[selectedShip];
   if (placedShips.find(p => p.name === def.name)) return; // already placed; tap list to pull back
@@ -418,8 +420,22 @@ function placedShipAt(key) {
 
 function clickPlacementCell(r, c) {
   const ship = placedShipAt(`${r},${c}`);
-  if (ship) { rotatePlacedShip(ship); return; }
+  if (ship) { tapPlacedShip(ship); return; }
   placeAt(r, c);
+}
+
+// Single tap selects the ship; a second tap on it within the window rotates it.
+function tapPlacedShip(ship) {
+  const now = Date.now();
+  const isDouble = lastShipTap && lastShipTap.name === ship.name && now - lastShipTap.time < 400;
+  lastShipTap = isDouble ? null : { name: ship.name, time: now };
+  if (isDouble) { rotatePlacedShip(ship); return; }
+  selectedShip = fleetDef.findIndex(s => s.name === ship.name);
+  if (ship.orient) {
+    orient = ship.orient;
+    $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
+  }
+  renderFleetList(); renderPlaceGrid();
 }
 
 function rotatePlacedShip(ship) {
@@ -484,7 +500,7 @@ function renderPlaceGrid(preview = []) {
     if (previewSet.has(key) && overlap) cls += ' overlap-preview';
     cell.className = cls;
     cell.textContent = ship && ship.cells[0] === key ? ship.name[0] : '';
-    cell.title = ship ? `${ship.name} - tap or drag to move` : '';
+    cell.title = ship ? `${ship.name} - drag to move, double-tap to rotate` : '';
   });
 }
 
@@ -546,7 +562,7 @@ function finishPlacementDrag(event) {
   ignoreNextPlacementClick = true;
   if (drag.fromShip && !drag.moved) {
     placedShips.push(drag.original);
-    rotatePlacedShip(drag.original);
+    tapPlacedShip(drag.original);
     event.preventDefault();
     return;
   }
