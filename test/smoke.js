@@ -113,6 +113,11 @@ function testMancalaMoveIdentity() {
   assert.strictEqual(mancala.applyMove(state, 'A', { pit: 2 }), null);
   assert.strictEqual(state.moveNumber, 1);
   assert.strictEqual(mancala.viewFor(state, 'A').moveNumber, 1);
+  const log = mancala.viewFor(state, 'A').moveLog;
+  assert.strictEqual(log.length, 1);
+  assert.strictEqual(log[0].n, 1);
+  assert.strictEqual(log[0].pickup, 2);
+  assert.deepStrictEqual(log[0].seq, [3, 4, 5, 6]);
 }
 
 function fleet() {

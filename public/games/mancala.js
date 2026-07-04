@@ -133,6 +133,7 @@
         lastCapture: 0,
         lastCaptureFrom: -1,
         moveNumber: 0,
+        log: [],
       };
     },
 
@@ -163,6 +164,19 @@
       state.lastCaptureFrom = cap.from;
       state.moveNumber = (state.moveNumber || 0) + 1;
 
+      // Rolling log so clients can animate every move since their last poll,
+      // not just the newest one (solo bot replies land in the same poll).
+      state.log = (state.log || []).slice(-15);
+      state.log.push({
+        n: state.moveNumber,
+        by: who,
+        pickup: pitIdx,
+        seq: s.seq,
+        capture: cap.count,
+        captureFrom: cap.from,
+        extraTurn,
+      });
+
       if (isGameOver(state.pits)) {
         state.pits = sweepBoard(state.pits);
         state.winner = calcWinner(state.pits);
@@ -187,8 +201,9 @@
         pits: state.pits.slice(),
         isMyTurn,
         validMoves,
-        // Board layout (each player sees their own pits at the bottom)
-        myPitIndices:  who === 'A' ? [0,1,2,3,4,5] : [12,11,10,9,8,7],
+        // Board layout (each player sees their own pits at the bottom,
+        // listed left-to-right in sow order so play flows toward their store)
+        myPitIndices:  who === 'A' ? [0,1,2,3,4,5] : [7,8,9,10,11,12],
         oppPitIndices: who === 'A' ? [12,11,10,9,8,7] : [5,4,3,2,1,0],
         myStoreIndex:  who === 'A' ? 6 : 13,
         oppStoreIndex: who === 'A' ? 13 : 6,
@@ -200,6 +215,7 @@
         captureCount: state.lastCapture,
         captureFrom:  state.lastCaptureFrom,
         moveNumber:   state.moveNumber || 0,
+        moveLog:      (state.log || []).slice(),
       };
     },
 

@@ -349,155 +349,206 @@
   body.is-phone .uttt-mini { gap: 2px; padding: 2px; }
   @media (min-width: 720px) { .uttt-panel { max-width: 620px; margin-left: auto; margin-right: auto; } }
 
-  /* Mancala */
-  .mnc-panel { overflow: hidden; }
-  .mnc-wrap {
-    margin-top: 14px; padding: 10px;
-    border: 1px solid rgba(255,179,71,.22); border-radius: 18px;
-    background: linear-gradient(180deg, #1c0e04, #0e0702);
-    box-shadow: inset 0 0 32px rgba(0,0,0,.55), 0 18px 40px rgba(0,0,0,.4);
+  /* Mancala: fixed full-viewport, orientation-adaptive carved-wood board */
+  body.mancala-mode { overflow: hidden; }
+  #mancala.mnc-screen {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; gap: 8px;
+    padding: calc(env(safe-area-inset-top) + 8px) max(10px, env(safe-area-inset-right)) calc(env(safe-area-inset-bottom) + 10px) max(10px, env(safe-area-inset-left));
+    background:
+      radial-gradient(120% 80% at 50% -10%, #0e2c3a 0%, var(--abyss) 60%),
+      var(--abyss);
+  }
+  #mancala .status { margin-top: 0; flex: none; }
+  .mnc-stage {
+    position: relative; flex: 1; min-height: 0;
+    container-type: size;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mnc-stage::before {
+    content: ""; position: absolute; inset: 6%; pointer-events: none;
+    background: radial-gradient(55% 55% at 50% 50%, rgba(255,150,60,.10), transparent 72%);
   }
   .mnc-board {
     position: relative;
-    display: grid;
-    grid-template-columns: 52px 1fr 52px;
-    grid-template-rows: 1fr 1fr;
-    gap: 6px;
-    padding: 10px;
-    background: linear-gradient(155deg, #2c1507, #180b03);
-    border-radius: 14px;
-    border: 1px solid rgba(255,179,71,.18);
+    display: grid; gap: clamp(5px, 1.6cqmin, 10px);
+    padding: clamp(8px, 2.6cqmin, 16px);
+    border-radius: 26px;
+    border: 1px solid rgba(255,179,71,.28);
+    background:
+      radial-gradient(120% 90% at 30% 0%, rgba(255,205,140,.10), transparent 55%),
+      repeating-linear-gradient(94deg, rgba(255,205,140,.045) 0px, rgba(255,205,140,.045) 2px, transparent 2px, transparent 8px),
+      linear-gradient(160deg, #3a1f0b, #190b03);
+    box-shadow:
+      inset 0 2px 0 rgba(255,215,160,.10), inset 0 -3px 12px rgba(0,0,0,.6),
+      0 22px 50px rgba(0,0,0,.55);
+    transition: border-color .3s ease, box-shadow .3s ease;
+    /* portrait default: vertical board, stores top and bottom */
+    grid-template-areas:
+      "os  os"
+      "od0 m0"
+      "od1 m1"
+      "od2 m2"
+      "od3 m3"
+      "od4 m4"
+      "od5 m5"
+      "ms  ms";
+    grid-template-rows: 0.95fr repeat(6, 1fr) 0.95fr;
+    grid-template-columns: 1fr 1fr;
+    aspect-ratio: 1 / 2;
+    width: min(100cqw, 50cqh, 440px);
+    height: auto;
   }
-  .mnc-store {
-    grid-row: 1 / span 2;
-    border-radius: 999px;
-    background: radial-gradient(ellipse at 40% 30%, #120801, #070401 70%);
-    box-shadow: inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03), 0 0 0 1px rgba(0,0,0,.7);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 6px;
-    padding: 10px 0; min-height: 88px;
-    transition: box-shadow .2s ease;
+  @container (min-aspect-ratio: 1/1) {
+    .mnc-board {
+      grid-template-areas:
+        "os od0 od1 od2 od3 od4 od5 ms"
+        "os m0  m1  m2  m3  m4  m5  ms";
+      grid-template-columns: 0.95fr repeat(6, 1fr) 0.95fr;
+      grid-template-rows: 1fr 1fr;
+      aspect-ratio: 3.2 / 1;
+      width: min(100cqw, 320cqh, 920px);
+      height: auto;
+    }
   }
-  .mnc-store.mine {
-    box-shadow: inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03),
-                0 0 0 2px rgba(255,179,71,.45), 0 0 14px rgba(255,179,71,.14);
+  .mnc-board.my-turn {
+    border-color: rgba(52,231,196,.4);
+    box-shadow:
+      inset 0 2px 0 rgba(255,215,160,.10), inset 0 -3px 12px rgba(0,0,0,.6),
+      0 22px 50px rgba(0,0,0,.55), 0 0 26px rgba(52,231,196,.12);
   }
-  .mnc-store.opp {
-    box-shadow: inset 0 6px 18px rgba(0,0,0,.8), inset 0 -2px 6px rgba(255,255,255,.03),
-                0 0 0 1px rgba(52,231,196,.28), 0 0 10px rgba(52,231,196,.08);
-  }
-  .mnc-store .mnc-scount {
-    font-size: clamp(22px, 7vw, 34px); font-weight: 900; line-height: 1;
-    letter-spacing: -1px; transition: transform .15s ease;
-  }
-  .mnc-store.mine .mnc-scount { color: var(--amber); text-shadow: 0 0 12px rgba(255,179,71,.5); }
-  .mnc-store.opp  .mnc-scount { color: var(--sonar); text-shadow: 0 0 10px rgba(52,231,196,.4); }
-  .mnc-store .mnc-slabel {
-    font-size: 9px; letter-spacing: 1.8px; text-transform: uppercase; color: var(--mute);
-  }
-  .mnc-row {
-    display: flex; gap: 5px; align-items: stretch; padding: 0;
-  }
-  .mnc-row.opp { grid-column: 2; grid-row: 1; }
-  .mnc-row.mine { grid-column: 2; grid-row: 2; }
-  .mnc-pit {
-    flex: 1; aspect-ratio: 1; border-radius: 50%;
-    background: radial-gradient(circle at 38% 30%, #1c0e04, #080402 68%);
-    box-shadow: inset 0 5px 12px rgba(0,0,0,.75), inset 0 -1px 3px rgba(255,255,255,.04), 0 0 0 1px rgba(0,0,0,.6);
-    display: flex; align-items: center; justify-content: center;
-    cursor: default; position: relative;
-    transition: transform .1s ease, box-shadow .12s ease;
+  .area-os  { grid-area: os; }  .area-ms  { grid-area: ms; }
+  .area-m0  { grid-area: m0; }  .area-m1  { grid-area: m1; }  .area-m2 { grid-area: m2; }
+  .area-m3  { grid-area: m3; }  .area-m4  { grid-area: m4; }  .area-m5 { grid-area: m5; }
+  .area-od0 { grid-area: od0; } .area-od1 { grid-area: od1; } .area-od2 { grid-area: od2; }
+  .area-od3 { grid-area: od3; } .area-od4 { grid-area: od4; } .area-od5 { grid-area: od5; }
+
+  .mnc-pit, .mnc-store {
+    position: relative; min-width: 0; min-height: 0;
+    background: radial-gradient(ellipse at 42% 32%, #180b03, #050301 74%);
+    box-shadow:
+      inset 0 6px 16px rgba(0,0,0,.85), inset 0 -2px 5px rgba(255,205,140,.07),
+      0 1px 0 rgba(255,205,140,.08);
     user-select: none; touch-action: manipulation;
+  }
+  .mnc-pit {
+    border-radius: 50%; cursor: default;
+    transition: box-shadow .18s ease, transform .12s ease, opacity .25s ease;
   }
   .mnc-pit.valid {
     cursor: pointer;
-    box-shadow: inset 0 5px 12px rgba(0,0,0,.6), 0 0 0 2px rgba(255,179,71,.6), 0 0 12px rgba(255,179,71,.22);
+    box-shadow:
+      inset 0 6px 16px rgba(0,0,0,.7), inset 0 -2px 5px rgba(255,205,140,.07),
+      0 0 0 2px rgba(255,179,71,.65), 0 0 14px rgba(255,179,71,.25);
+    animation: mncBreathe 2.4s ease-in-out infinite;
   }
-  .mnc-pit.valid:active { transform: scale(.91); }
-  .mnc-pit.empty { opacity: .38; }
-  .mnc-count {
-    font-size: clamp(13px, 4.6vw, 21px); font-weight: 900; line-height: 1;
-    letter-spacing: -.5px; pointer-events: none;
-  }
-  .mnc-pit.mine .mnc-count { color: var(--amber); }
-  .mnc-pit.opp  .mnc-count { color: var(--sonar); opacity: .8; }
-  .mnc-pit.empty .mnc-count { opacity: 0; }
-  /* hide number when seeds ≤5 — dice dots take over */
-  .mnc-pit:not(.many):not(.empty) .mnc-count { opacity: 0; }
-  /* dice-face SVG stones for 1-5 seeds */
-  .mnc-dots-svg {
-    position: absolute; inset: 14% 16%; width: 68%; height: 68%;
-    pointer-events: none; overflow: visible;
-  }
-  .mnc-pit.mine .mnc-dots-svg circle { fill: var(--amber); filter: drop-shadow(0 0 3px rgba(255,179,71,.55)); }
-  .mnc-pit.opp  .mnc-dots-svg circle { fill: var(--sonar);  filter: drop-shadow(0 0 2px rgba(52,231,196,.4)); }
+  .mnc-pit.valid:active { transform: scale(.94); }
+  .mnc-pit.empty { opacity: .55; }
+  @keyframes mncBreathe { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
 
-  /* landing bounce */
-  @keyframes mnc-land {
-    0%   { transform: scale(1); }
-    28%  { transform: scale(1.32); filter: brightness(1.6); }
-    60%  { transform: scale(.93); filter: brightness(1.1); }
-    100% { transform: scale(1);   filter: brightness(1); }
+  .mnc-store { border-radius: 999px; }
+  .mnc-store.mine { box-shadow: inset 0 6px 16px rgba(0,0,0,.85), inset 0 -2px 5px rgba(255,205,140,.07), 0 0 0 2px rgba(255,179,71,.5), 0 0 16px rgba(255,179,71,.15); }
+  .mnc-store.opp  { box-shadow: inset 0 6px 16px rgba(0,0,0,.85), inset 0 -2px 5px rgba(255,205,140,.07), 0 0 0 1px rgba(52,231,196,.32), 0 0 12px rgba(52,231,196,.09); }
+  .mnc-scount {
+    position: absolute; inset: 0; z-index: 3;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(20px, 8cqmin, 38px); font-weight: 900; letter-spacing: -1px;
+    pointer-events: none;
+    text-shadow: 0 0 6px rgba(0,0,0,.95), 0 0 14px rgba(0,0,0,.9);
   }
-  .mnc-pit.land { animation: mnc-land .26s ease-out; }
-  .mnc-pit.pickup { animation: mnc-pickup .32s ease-out; }
-  @keyframes mnc-pickup { 0% { transform: scale(1); } 45% { transform: translateY(-8px) scale(1.12); filter: brightness(1.7); } 100% { transform: scale(1); } }
+  .mnc-store.mine .mnc-scount { color: var(--amber); }
+  .mnc-store.opp  .mnc-scount { color: var(--sonar); }
+  .mnc-slabel {
+    position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); z-index: 3;
+    font-size: clamp(8px, 2.4cqmin, 11px); letter-spacing: 2px; text-transform: uppercase;
+    color: var(--mute); pointer-events: none;
+    text-shadow: 0 0 5px rgba(0,0,0,.9);
+  }
+  .mnc-store.winner { animation: mncWinPulse 1.3s ease-in-out infinite; }
+  @keyframes mncWinPulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.7); }
+  }
+
+  /* individual seed pebbles */
+  .mnc-sd {
+    position: absolute; z-index: 1; pointer-events: none;
+    width: clamp(9px, 4.4cqmin, 17px); aspect-ratio: 1;
+    border-radius: 52% 46% 50% 48%;
+  }
+  .mnc-sd.mine { background: radial-gradient(circle at 35% 30%, #ffe2ae, #ffb347 55%, #96540f); box-shadow: 0 1px 2px rgba(0,0,0,.65), 0 0 6px rgba(255,179,71,.22); }
+  .mnc-sd.opp  { background: radial-gradient(circle at 35% 30%, #c8fff1, #34e7c4 55%, #0b5b4b); box-shadow: 0 1px 2px rgba(0,0,0,.65), 0 0 6px rgba(52,231,196,.2); }
+  .mnc-sd.v1 { filter: hue-rotate(-8deg) brightness(.9); }
+  .mnc-sd.v2 { filter: hue-rotate(7deg) brightness(1.08); }
+  .mnc-sd.drop-in { animation: mncDrop .32s cubic-bezier(.2,.75,.35,1.1); }
+  @keyframes mncDrop {
+    from { transform: translate(-50%, -50%) scale(2.2) rotate(90deg); opacity: 0; filter: brightness(2.4); }
+  }
+
+  /* per-pit count chip */
+  .mnc-chip {
+    position: absolute; right: 6%; bottom: 5%; z-index: 2;
+    min-width: 17px; padding: 1px 4px; border-radius: 9px;
+    font-size: clamp(10px, 3cqmin, 13px); font-weight: 800; text-align: center; line-height: 1.3;
+    background: rgba(4,3,1,.74); pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(255,205,140,.12);
+  }
+  .mnc-pit.mine .mnc-chip { color: var(--amber); }
+  .mnc-pit.opp  .mnc-chip { color: var(--sonar); }
+  .mnc-chip.bump { animation: mncChipBump .26s ease; }
+  @keyframes mncChipBump { 40% { transform: scale(1.4); } }
+
+  /* the sowing hand: glowing disc that walks the pits dropping seeds */
+  .mnc-hand {
+    position: absolute; z-index: 6; pointer-events: none;
+    width: clamp(26px, 9cqmin, 42px); height: clamp(26px, 9cqmin, 42px);
+    border-radius: 50%; opacity: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: clamp(12px, 4cqmin, 17px);
+    transform: translate(-50%, -50%);
+    transition: left .16s cubic-bezier(.3,.7,.4,1), top .16s cubic-bezier(.3,.7,.4,1), opacity .16s ease;
+  }
+  .mnc-hand.mine { background: radial-gradient(circle at 35% 30%, #ffe9c2, var(--amber) 60%, #b96f1a); box-shadow: 0 4px 14px rgba(0,0,0,.5), 0 0 20px rgba(255,179,71,.6); color: #3a1d02; }
+  .mnc-hand.opp  { background: radial-gradient(circle at 35% 30%, #d6fff5, var(--sonar) 60%, #12866e); box-shadow: 0 4px 14px rgba(0,0,0,.5), 0 0 20px rgba(52,231,196,.55); color: #04231d; }
+
+  /* pit reactions */
+  .mnc-pit.land, .mnc-store.land { animation: mncLandKf .26s ease-out; }
+  @keyframes mncLandKf {
+    30% { transform: scale(1.08); filter: brightness(1.55); }
+    65% { transform: scale(.97); }
+  }
+  .mnc-pit.pickup-anim { animation: mncPick .3s ease-out; }
+  @keyframes mncPick { 40% { transform: scale(1.06); filter: brightness(1.9); } }
+  .mnc-pit.raided { animation: mncRaid .55s ease-out; }
+  @keyframes mncRaid {
+    25% { filter: brightness(2.1); box-shadow: inset 0 6px 16px rgba(0,0,0,.4), 0 0 0 3px var(--fire), 0 0 18px rgba(255,91,81,.55); }
+  }
+
+  /* seed in flight (captures + endgame sweep) */
   .mnc-floater {
-    position: absolute; z-index: 5; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+    position: absolute; z-index: 5; width: clamp(9px, 4.4cqmin, 16px); height: clamp(9px, 4.4cqmin, 16px);
     border-radius: 50%; pointer-events: none;
-    animation: mnc-fly .36s cubic-bezier(.15,.75,.28,1) forwards;
+    animation: mncFly .44s cubic-bezier(.15,.75,.28,1) forwards;
   }
-  .mnc-floater.mine { background: var(--amber); box-shadow: 0 0 10px rgba(255,179,71,.8); }
-  .mnc-floater.opp { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.65); }
-  @keyframes mnc-fly {
+  .mnc-floater.mine { background: radial-gradient(circle at 35% 30%, #ffe2ae, var(--amber)); box-shadow: 0 0 10px rgba(255,179,71,.8); }
+  .mnc-floater.opp  { background: radial-gradient(circle at 35% 30%, #c8fff1, var(--sonar)); box-shadow: 0 0 10px rgba(52,231,196,.65); }
+  @keyframes mncFly {
     0% { transform: translate(0, 0) scale(.9); opacity: 0; }
     18% { opacity: 1; }
-    55% { transform: translate(calc(var(--dx) * .55), calc(var(--dy) * .55 - 24px)) scale(1.2); }
+    55% { transform: translate(calc(var(--dx) * .55), calc(var(--dy) * .55 - 26px)) scale(1.25); }
     100% { transform: translate(var(--dx), var(--dy)) scale(.75); opacity: 0; }
   }
 
-  /* capture flash on winning store */
-  @keyframes mnc-capture-flash {
-    0%   { filter: brightness(1); }
-    25%  { filter: brightness(2.2); }
-    60%  { filter: brightness(1.4); }
-    100% { filter: brightness(1); }
+  /* store event flashes */
+  .mnc-store.capture-anim { animation: mncCaptureFlash .5s ease-out; }
+  @keyframes mncCaptureFlash {
+    25% { filter: brightness(2.2); }
+    60% { filter: brightness(1.4); }
   }
-  .mnc-store.capture-anim { animation: mnc-capture-flash .5s ease-out; }
-
-  /* extra-turn store pulse */
-  @keyframes mnc-extraturn {
-    0%, 100% { transform: scaleY(1); }
-    50%       { transform: scaleY(1.07);
-                box-shadow: inset 0 6px 18px rgba(0,0,0,.6), 0 0 0 3px var(--sonar), 0 0 22px rgba(52,231,196,.4); }
-  }
-  .mnc-store.extraturn-anim { animation: mnc-extraturn .55s ease-in-out 2; }
-
-  .mnc-legend {
-    display: flex; justify-content: space-between; gap: 10px;
-    margin-top: 12px; color: var(--mute); font-size: 12px;
-    align-items: center;
-  }
-  .mnc-legend-score { font-size: 15px; font-weight: 700; letter-spacing: -.5px; }
-  .mnc-legend-score.mine { color: var(--amber); }
-  .mnc-legend-score.opp  { color: var(--sonar); }
-  .mnc-seed {
-    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
-    margin-right: 5px; vertical-align: -1px;
-  }
-  .mnc-seed.mine { background: var(--amber); box-shadow: 0 0 7px rgba(255,179,71,.5); }
-  .mnc-seed.opp  { background: var(--sonar);  box-shadow: 0 0 7px rgba(52,231,196,.4); }
-
-  body.is-phone .mnc-wrap { padding: 6px; }
-  body.is-phone .mnc-board { grid-template-columns: 38px 1fr 38px; gap: 4px; padding: 6px; }
-  body.is-phone .mnc-row { gap: 3px; }
-  body.is-phone .mnc-store { min-height: 72px; }
-  body.is-phone .mnc-store .mnc-scount { font-size: clamp(18px, 7vw, 26px); }
-  @media (min-width: 720px) {
-    .mnc-panel { max-width: 620px; margin-left: auto; margin-right: auto; }
-    .mnc-board { grid-template-columns: 64px 1fr 64px; gap: 8px; padding: 12px; }
-    .mnc-pit .mnc-count { font-size: 22px; }
-    .mnc-store .mnc-scount { font-size: 36px; }
+  .mnc-store.extraturn-anim { animation: mncExtraTurn .55s ease-in-out 2; }
+  @keyframes mncExtraTurn {
+    50% { transform: scale(1.05);
+          box-shadow: inset 0 6px 16px rgba(0,0,0,.6), 0 0 0 3px var(--sonar), 0 0 22px rgba(52,231,196,.45); }
   }
 
   /* UNO */
@@ -724,7 +775,7 @@
     </div>
     <div class="battle-dock">
       <button id="fireBtn" class="primary fire-btn" onclick="confirmFire()" disabled>FIRE</button>
-      <button id="fxBtn" class="ghost dock-small" onclick="toggleBattleFx()">FX on</button>
+      <button id="fxBtn" class="ghost dock-small fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary dock-small solo-restart hidden" onclick="restartComputerGame()">New game</button>
       <button class="ghost dock-small" onclick="leaveGame()">Leave</button>
     </div>
@@ -785,14 +836,16 @@
   </section>
 
   <!-- MANCALA -->
-  <section id="mancala" class="card mnc-panel hidden">
+  <section id="mancala" class="mnc-screen hidden">
     <div id="mncStatus" class="status">...</div>
-    <div class="mnc-wrap">
+    <div class="mnc-stage">
       <div id="mncBoard" class="mnc-board"></div>
     </div>
-    <div class="mnc-legend" id="mncLegend"></div>
-    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
-    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+    <div class="battle-dock">
+      <button class="ghost dock-small fx-btn" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary dock-small solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost dock-small" onclick="leaveGame()">Leave</button>
+    </div>
   </section>
 
   <!-- ULTIMATE TTT -->
