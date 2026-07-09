@@ -106,6 +106,8 @@ function beginBattle(state, players) {
   state.phase = 'battle';
   state.turnIndex = 0;
   state.direction = 1;
+  state.moveNumber = 0;
+  state.log = [];
   syncTurn(state);
   state.lastAction = { text: 'Game started. First player: A.' };
   return null;
@@ -120,6 +122,15 @@ function firstLegalMove(state, who) {
   if (!card) return { action: 'draw' };
   return { action: 'play', cardId: card.id, color: card.color === 'wild' ? mostCommonColor(state.hands[who]) : card.color };
 }
+// Rolling public-action log so clients can animate every play/draw since
+// their last poll (solo bots resolve several turns inside a single poll).
+// Only public information goes in here: played cards and draw COUNTS.
+function logAction(state, entry) {
+  state.moveNumber = (state.moveNumber || 0) + 1;
+  state.log = (state.log || []).slice(-15);
+  state.log.push({ n: state.moveNumber, ...entry });
+}
+
 function cardSortKey(card) {
   const colorOrder = { red: 0, gold: 1, green: 2, blue: 3, wild: 4 };
   const kindOrder = { number: 0, skip: 10, reverse: 11, draw2: 12, wild: 13, wild4: 14 };
@@ -166,6 +177,8 @@ const onecard = {
       turn: null,
       winner: null,
       lastAction: null,
+      moveNumber: 0,
+      log: [],
     };
   },
 
@@ -184,7 +197,12 @@ const onecard = {
 
     if (action === 'draw') {
       const drawn = drawMany(state, who, 1);
-      state.lastAction = { by: who, text: `${who} drew ${drawn.length === 1 ? 'a card' : `${drawn.length} cards`} and passed.`, drawn: drawn.length };
+      state.lastAction = {
+        by: who,
+        text: drawn.length ? `${who} drew a card and passed.` : `${who} had nothing to draw and passed.`,
+        drawn: drawn.length,
+      };
+      logAction(state, { by: who, action: 'draw', count: drawn.length });
       advanceTurn(state);
       return null;
     }
@@ -206,6 +224,16 @@ const onecard = {
       state.phase = 'over';
       state.winner = who;
       state.turn = null;
+      logAction(state, {
+        by: who,
+        action: 'play',
+        card: { id: card.id, color: card.color, kind: card.kind, rank: card.rank || null },
+        color: state.currentColor,
+        handLeft: 0,
+        drawTarget: null,
+        drawn: 0,
+        direction: state.direction,
+      });
       return null;
     }
 
@@ -222,6 +250,16 @@ const onecard = {
       state.lastAction.text += ` ${target} drew ${card.kind === 'draw2' ? 2 : 4}.`;
       steps = 2;
     }
+    logAction(state, {
+      by: who,
+      action: 'play',
+      card: { id: card.id, color: card.color, kind: card.kind, rank: card.rank || null },
+      color: state.currentColor,
+      handLeft: hand.length,
+      drawTarget: state.lastAction.drawTarget || null,
+      drawn: state.lastAction.drawTarget ? (card.kind === 'draw2' ? 2 : 4) : 0,
+      direction: state.direction,
+    });
     advanceTurn(state, steps);
     return null;
   },
@@ -252,6 +290,8 @@ const onecard = {
       drawCount: state.drawPile.length,
       discardCount: state.discardPile.length,
       lastAction: state.lastAction,
+      moveNumber: state.moveNumber || 0,
+      moveLog: (state.log || []).slice(),
     };
   },
 };
