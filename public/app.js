@@ -21,6 +21,8 @@ let placementDrag = null;
 let ignoreNextPlacementClick = false;
 let lastShipTap = null; // { name, time } for double-tap-to-rotate
 let oneCardHandUi = { selectedIndex: 0, selectedCardId: null, raised: false, gesture: null, lastGesture: null };
+let connectUi = { focusedCol: 3, lastMoveNumber: 0, boardSig: '', overFxDone: false };
+let connectLastData = null;
 
 // ---- mobile / orientation ergonomics
 function isLikelyPhone() {
@@ -289,6 +291,9 @@ function resetGameUi() {
   $('myGrid').innerHTML = '';
   $('connectColumns').innerHTML = '';
   $('connectBoard').innerHTML = '';
+  connectUi = { focusedCol: 3, lastMoveNumber: 0, boardSig: '', overFxDone: false };
+  connectLastData = null;
+  if ($('connectEndBanner')) $('connectEndBanner').classList.add('hidden');
   if ($('mncBoard')) {
     $('mncBoard').innerHTML = '';
     $('mncBoard').classList.remove('my-turn');
@@ -1055,7 +1060,87 @@ function battleStatusText(v, d) {
 
 // ---------------- connect four ----------------
 function connectCanMove(v, c) {
-  return v.phase === 'battle' && v.turn === session.you && v.legalMoves.includes(c);
+  return !!(v && session && v.phase === 'battle' && v.turn === session.you && (v.legalMoves || []).includes(c));
+}
+
+function connectOpponentSlot(d) {
+  const opponent = (d.players || []).find(player => player.slot !== d.you);
+  return opponent ? opponent.slot : d.you === 'A' ? 'B' : 'A';
+}
+
+function connectDropRow(v, c) {
+  if (!v || !v.board || c < 0 || c >= (v.cols || 7)) return -1;
+  for (let r = (v.rows || 6) - 1; r >= 0; r--) {
+    if (!v.board[r][c]) return r;
+  }
+  return -1;
+}
+
+function connectLineFrom(board, r, c, slot, rows, cols) {
+  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (const [dr, dc] of dirs) {
+    const cells = [[r, c]];
+    for (const sign of [-1, 1]) {
+      let rr = r + dr * sign;
+      let cc = c + dc * sign;
+      while (rr >= 0 && rr < rows && cc >= 0 && cc < cols && board[rr][cc] === slot) {
+        cells.push([rr, cc]);
+        rr += dr * sign;
+        cc += dc * sign;
+      }
+    }
+    if (cells.length >= 4) return cells.slice(0, 4).map(([row, col]) => `${row},${col}`);
+  }
+  return null;
+}
+
+function connectWouldWin(v, c, slot) {
+  const row = connectDropRow(v, c);
+  if (row < 0) return false;
+  const board = v.board.map(sourceRow => sourceRow.slice());
+  board[row][c] = slot;
+  return !!connectLineFrom(board, row, c, slot, v.rows || 6, v.cols || 7);
+}
+
+function connectColumnTone(v, c, d) {
+  if (!(v.legalMoves || []).includes(c)) return { kind: 'full', label: 'Full' };
+  if (connectWouldWin(v, c, d.you)) return { kind: 'win', label: 'Win' };
+  if (connectWouldWin(v, c, connectOpponentSlot(d))) return { kind: 'block', label: 'Block' };
+  if (c === Math.floor((v.cols || 7) / 2)) return { kind: 'center', label: 'Mid' };
+  return { kind: 'open', label: String(c + 1) };
+}
+
+function connectSfx(kind) {
+  if (!battleFxOn) return;
+  const audio = mncEnsureAudio();
+  if (!audio || audio.state !== 'running') return;
+  const t = audio.currentTime;
+  if (kind === 'drop') {
+    battleTone(audio, t, 460, 0.16, { type: 'triangle', slideTo: 210, gain: 0.07 });
+    battleTone(audio, t + 0.14, 180, 0.08, { type: 'sine', gain: 0.08 });
+  } else if (kind === 'select') {
+    battleTone(audio, t, 920, 0.045, { type: 'square', gain: 0.035 });
+  }
+}
+
+function connectSetFocus(c, renderAgain = true) {
+  const cols = (lastView && lastView.cols) || 7;
+  connectUi.focusedCol = Math.max(0, Math.min(cols - 1, c));
+  if (renderAgain && connectLastData && lastView && lastView.ui === 'connectfour') {
+    renderConnectFour(connectLastData, lastView);
+  }
+}
+
+function connectStepFocus(delta) {
+  if (!lastView || lastView.ui !== 'connectfour') return;
+  const cols = lastView.cols || 7;
+  let next = connectUi.focusedCol;
+  for (let i = 0; i < cols; i++) {
+    next = (next + delta + cols) % cols;
+    if (!lastView.legalMoves || lastView.legalMoves.includes(next)) break;
+  }
+  connectSetFocus(next);
+  connectSfx('select');
 }
 
 function renderConnectFour(d, v) {
@@ -1065,52 +1150,128 @@ function renderConnectFour(d, v) {
   const board = $('connectBoard');
   const winning = new Set(v.winningCells || []);
   const last = v.lastMove ? `${v.lastMove.r},${v.lastMove.c}` : null;
+  const boardSig = v.board.map(row => row.map(cell => cell || '-').join('')).join('/');
+  const newMove = (v.moveNumber || 0) > (connectUi.lastMoveNumber || 0) && connectUi.boardSig && boardSig !== connectUi.boardSig;
+  const opponentSlot = connectOpponentSlot(d);
+  const opponentName = d.opponentName || 'Opponent';
+  const legal = v.legalMoves || [];
+
+  connectLastData = d;
+  if (connectUi.focusedCol >= cols) connectUi.focusedCol = Math.floor(cols / 2);
+  if (!legal.includes(connectUi.focusedCol) && legal.length) {
+    connectUi.focusedCol = legal.includes(Math.floor(cols / 2)) ? Math.floor(cols / 2) : legal[0];
+  }
+  const focused = connectUi.focusedCol;
+  const focusedTone = connectColumnTone(v, focused, d);
+  const previewRow = connectCanMove(v, focused) ? connectDropRow(v, focused) : -1;
+
+  const youPanel = $('connectYouPanel');
+  const opponentPanel = $('connectOpponentPanel');
+  const turnBadge = $('connectTurnBadge');
+  if (youPanel) youPanel.className = `connect-player you${v.phase === 'battle' && v.turn === d.you ? ' active' : ''}`;
+  if (opponentPanel) opponentPanel.className = `connect-player opponent${v.phase === 'battle' && v.turn === opponentSlot ? ' active' : ''}`;
+  if ($('connectYouName')) $('connectYouName').textContent = d.youName || 'You';
+  if ($('connectOpponentName')) $('connectOpponentName').textContent = opponentName;
+  if (turnBadge) turnBadge.className = `connect-turn${v.phase === 'battle' && v.turn !== d.you ? ' opponent' : ''}`;
+  if ($('connectTurnText')) $('connectTurnText').textContent = v.phase === 'over' ? 'Done' : v.turn === d.you ? 'You' : 'Them';
 
   columns.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   columns.innerHTML = '';
   for (let c = 0; c < cols; c++) {
+    const tone = connectColumnTone(v, c, d);
     const btn = document.createElement('button');
-    btn.className = 'drop-btn';
-    btn.textContent = '▼';
+    btn.className = 'drop-btn'
+      + (c === focused ? ' selected' : '')
+      + (tone.kind === 'win' ? ' win-now' : '')
+      + (tone.kind === 'block' ? ' block-now' : '');
+    btn.dataset.label = tone.label;
     btn.disabled = !connectCanMove(v, c);
     btn.setAttribute('aria-label', `Drop disc in column ${c + 1}`);
+    btn.onpointerenter = () => connectSetFocus(c);
+    btn.onfocus = () => connectSetFocus(c);
     btn.onclick = () => dropConnectDisc(c);
     columns.appendChild(btn);
   }
 
   board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  board.className = `connect-board${v.phase === 'over' && v.winner ? ' win' : ''}`;
+  board.setAttribute('role', 'grid');
+  board.setAttribute('aria-label', 'Connect Four board');
   board.innerHTML = '';
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
     const owner = v.board[r][c];
     const key = `${r},${c}`;
+    const isPreview = !owner && r === previewRow && c === focused;
+    const relation = owner ? owner === d.you ? ' you' : ' opponent' : '';
     const cell = document.createElement('div');
     cell.className = 'connect-cell'
-      + (owner ? ` ${owner}` : '')
+      + relation
+      + (connectCanMove(v, c) ? ' playable' : '')
+      + (isPreview ? ' preview' : '')
+      + (isPreview && focusedTone.kind === 'block' ? ' danger-preview' : '')
       + (last === key ? ' last' : '')
+      + (last === key && newMove ? ' drop-in' : '')
       + (winning.has(key) ? ' win' : '');
-    cell.setAttribute('aria-label', owner ? `${owner === d.you ? 'Your' : 'Opponent'} disc` : 'Empty slot');
+    cell.setAttribute('role', 'gridcell');
+    cell.setAttribute('aria-label', owner ? `${owner === d.you ? 'Your' : opponentName} disc` : `Empty slot, column ${c + 1}`);
+    cell.onpointerenter = () => connectSetFocus(c);
+    cell.onclick = () => dropConnectDisc(c);
+    if (owner) {
+      const token = document.createElement('span');
+      token.className = 'connect-token';
+      cell.appendChild(token);
+    }
     board.appendChild(cell);
   }
 
   const banner = $('connectStatus');
+  const end = $('connectEndBanner');
   if (v.phase === 'over') {
     const tied = !v.winner;
     const won = v.winner === d.you;
     banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
     banner.textContent = tied ? 'DRAW - the grid is full' : won ? 'VICTORY - four connected' : 'DEFEAT - rival connected four';
+    if (end) {
+      end.className = 'connect-end ' + (tied ? 'draw' : won ? 'win' : 'lose');
+      $('connectEndTitle').textContent = tied ? 'Draw' : won ? 'Victory' : 'Defeat';
+      $('connectEndSub').textContent = tied ? 'No lanes left' : 'Four in a row';
+    }
+    if (!connectUi.overFxDone) {
+      battleSfx(tied ? 'miss' : won ? 'win' : 'lose');
+      battleVibrate(tied ? 18 : [18, 55, 18]);
+      connectUi.overFxDone = true;
+    }
   } else if (v.turn === d.you) {
     banner.className = 'status you';
-    banner.textContent = 'YOUR DROP - choose a column';
+    const winningDrops = legal.filter(c => connectColumnTone(v, c, d).kind === 'win');
+    const blocks = legal.filter(c => connectColumnTone(v, c, d).kind === 'block');
+    if (winningDrops.length) banner.textContent = `YOUR DROP - win in column ${winningDrops[0] + 1}`;
+    else if (blocks.length) banner.textContent = `YOUR DROP - block column ${blocks[0] + 1}`;
+    else banner.textContent = `YOUR DROP - column ${focused + 1}`;
+    if (end) end.classList.add('hidden');
+    connectUi.overFxDone = false;
   } else {
     banner.className = 'status them';
-    banner.textContent = `Standing by - ${d.opponentName || 'opponent'} is lining up a drop...`;
+    banner.textContent = `Standing by - ${opponentName} is lining up a drop...`;
+    if (end) end.classList.add('hidden');
+    connectUi.overFxDone = false;
   }
+  if (newMove) {
+    banner.classList.add('activity');
+    connectSfx('drop');
+    battleVibrate(12);
+  }
+  connectUi.lastMoveNumber = v.moveNumber || 0;
+  connectUi.boardSig = boardSig;
 }
 
 async function dropConnectDisc(c) {
   if (!lastView || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
   if (!lastView.legalMoves.includes(c)) { toast('That column is full.'); return; }
+  connectSetFocus(c, false);
   try {
+    connectSfx('drop');
+    battleVibrate(10);
     await api('/api/move', 'POST', { room: session.room, move: { c } });
     poll();
   } catch (e) { toast(e.message); }
@@ -2183,8 +2344,13 @@ document.addEventListener('keydown', e => {
   if (e.target && ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)) return;
   if (!session) return;
   if (e.key.toLowerCase() === 'r' && !$('placement').classList.contains('hidden')) toggleOrient();
+  if (lastView && lastView.ui === 'connectfour') {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); connectStepFocus(-1); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); connectStepFocus(1); return; }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dropConnectDisc(connectUi.focusedCol); return; }
+  }
   const n = Number(e.key);
-  if (n >= 1 && n <= 7 && lastView && lastView.ui === 'connectfour') dropConnectDisc(n - 1);
+  if (n >= 1 && n <= 7 && lastView && lastView.ui === 'connectfour') { e.preventDefault(); dropConnectDisc(n - 1); }
   if (e.key.toLowerCase() === 'd' && lastView && lastView.ui === 'onecard') drawOneCard();
 });
 

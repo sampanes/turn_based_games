@@ -271,31 +271,182 @@
 
   /* connect four */
   .connect-panel {
+    --cf-bg: #06111f;
+    --cf-bg-2: #092338;
+    --cf-panel: rgba(8, 32, 50, .84);
+    --cf-panel-strong: rgba(4, 18, 31, .94);
+    --cf-line: rgba(58, 226, 240, .28);
+    --cf-line-strong: rgba(58, 226, 240, .62);
+    --cf-you: #2ee6e0;
+    --cf-you-soft: rgba(46, 230, 224, .34);
+    --cf-opp: #f6ad2d;
+    --cf-opp-soft: rgba(246, 173, 45, .34);
+    --cf-danger: #ff5b51;
+    --cf-muted: #91a9ba;
+    --cf-hole: #03101d;
+    --cf-gap: 8px;
     position: relative; overflow: hidden;
     background:
-      radial-gradient(circle at 18% 0%, rgba(52,231,196,.18), transparent 28%),
-      linear-gradient(180deg, rgba(17,49,63,.86), rgba(5,16,24,.9));
+      radial-gradient(circle at 16% 0%, rgba(46,230,224,.20), transparent 30%),
+      radial-gradient(circle at 88% 14%, rgba(246,173,45,.12), transparent 26%),
+      linear-gradient(180deg, rgba(7,29,48,.96), rgba(2,12,22,.96));
+    border-color: rgba(58,226,240,.34);
   }
   .connect-panel::before {
-    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .22;
-    background: radial-gradient(circle at 50% 18%, transparent 0 18%, rgba(52,231,196,.16) 19%, transparent 20%) 0 0/42px 42px;
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .26;
+    background:
+      linear-gradient(90deg, rgba(58,226,240,.08) 1px, transparent 1px),
+      linear-gradient(rgba(58,226,240,.08) 1px, transparent 1px);
+    background-size: 30px 30px;
+    mask: radial-gradient(80% 60% at 50% 40%, #000 0%, transparent 78%);
+  }
+  .connect-panel::after {
+    content: ""; position: absolute; left: -8%; right: -8%; top: -70px; height: 160px;
+    pointer-events: none; opacity: .54;
+    background: radial-gradient(50% 60% at 50% 100%, rgba(46,230,224,.26), transparent 72%);
   }
   .connect-panel > * { position: relative; z-index: 1; }
-  .connect-stage { margin-top: 14px; padding: 10px; border: 1px solid rgba(52,231,196,.22); border-radius: 18px; background: linear-gradient(180deg, #082838, #041018); box-shadow: inset 0 0 30px rgba(52,231,196,.08), 0 18px 40px rgba(0,0,0,.35); }
-  .connect-columns { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; margin-bottom: 8px; }
-  .drop-btn { min-height: var(--tap-target); padding: 8px 0; border-radius: 999px; background: rgba(52,231,196,.08); color: var(--sonar); border-color: rgba(52,231,196,.28); font-size: 18px; line-height: 1; }
-  .drop-btn:disabled { opacity: .28; cursor: not-allowed; }
-  .connect-board { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; padding: 10px; border-radius: 16px; background: linear-gradient(160deg, #0d4b67, #072233); border: 1px solid rgba(52,231,196,.28); box-shadow: inset 0 0 22px rgba(0,0,0,.55); }
-  .connect-cell { aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 35% 28%, #12394a, #061923 72%); box-shadow: inset 0 6px 12px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.05); }
-  .connect-cell.A { background: radial-gradient(circle at 34% 25%, #fff4b8 0 12%, #ffcf52 30%, #c97916 78%); box-shadow: 0 0 16px rgba(255,179,71,.42), inset 0 -8px 14px rgba(85,40,0,.35); }
-  .connect-cell.B { background: radial-gradient(circle at 34% 25%, #d9fff8 0 12%, #34e7c4 30%, #107160 78%); box-shadow: 0 0 16px rgba(52,231,196,.42), inset 0 -8px 14px rgba(0,55,45,.35); }
-  .connect-cell.last { outline: 2px solid #fff; outline-offset: -4px; }
-  .connect-cell.win { animation: connectWin 1s ease-in-out infinite alternate; }
-  @keyframes connectWin { from { transform: scale(1); filter: brightness(1); } to { transform: scale(1.08); filter: brightness(1.35); } }
-  .connect-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--mute); font-size: 12px; }
+  .connect-rail {
+    display: grid; grid-template-columns: 1fr minmax(98px, 130px) 1fr; align-items: stretch;
+    gap: 8px; margin-top: 12px; min-height: 74px;
+  }
+  .connect-player, .connect-turn {
+    min-width: 0; border: 1px solid var(--cf-line); background: linear-gradient(180deg, rgba(6,24,40,.9), rgba(2,11,20,.92));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 30px rgba(0,0,0,.28);
+  }
+  .connect-player {
+    display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px;
+  }
+  .connect-player.you { border-color: rgba(46,230,224,.42); }
+  .connect-player.opponent { border-color: rgba(246,173,45,.34); }
+  .connect-player.active.you { box-shadow: 0 0 24px var(--cf-you-soft), inset 0 1px 0 rgba(255,255,255,.08); }
+  .connect-player.active.opponent { box-shadow: 0 0 24px var(--cf-opp-soft), inset 0 1px 0 rgba(255,255,255,.08); }
+  .connect-player.opponent { justify-content: flex-end; text-align: right; }
+  .connect-player-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .connect-player-text strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; letter-spacing: 0; color: #f4fbff; }
+  .connect-player-text span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; letter-spacing: 0; color: var(--cf-muted); }
+  .cf-mini-disc {
+    width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; position: relative;
+    box-shadow: inset 0 4px 10px rgba(255,255,255,.22), inset 0 -10px 16px rgba(0,0,0,.36);
+  }
+  .cf-mini-disc.you { background: radial-gradient(circle at 34% 24%, #bffcff 0 11%, #2ee6e0 34%, #067f91 78%); box-shadow: 0 0 18px var(--cf-you-soft), inset 0 4px 10px rgba(255,255,255,.26), inset 0 -10px 16px rgba(0,0,0,.36); }
+  .cf-mini-disc.opponent { background: radial-gradient(circle at 34% 24%, #fff2b6 0 11%, #f6ad2d 34%, #b86108 78%); box-shadow: 0 0 18px var(--cf-opp-soft), inset 0 4px 10px rgba(255,255,255,.26), inset 0 -10px 16px rgba(0,0,0,.36); }
+  .cf-mini-disc::after {
+    content: ""; position: absolute; inset: 31% 25% 33%; opacity: .38;
+    background: rgba(255,255,255,.78);
+    clip-path: polygon(0 70%, 18% 38%, 36% 62%, 50% 20%, 64% 62%, 82% 38%, 100% 70%, 100% 100%, 0 100%);
+  }
+  .connect-turn {
+    border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 8px 6px; text-align: center;
+  }
+  .connect-turn span { color: var(--cf-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0; }
+  .connect-turn strong { color: var(--cf-you); font-size: 18px; line-height: 1.15; letter-spacing: 0; }
+  .connect-turn.opponent strong { color: var(--cf-opp); }
+  .connect-turn i {
+    width: 11px; height: 11px; border-right: 3px solid currentColor; border-bottom: 3px solid currentColor;
+    transform: rotate(45deg); margin-top: 2px; color: var(--cf-you);
+  }
+  .connect-turn.opponent i { color: var(--cf-opp); }
+  .connect-stage {
+    margin-top: 12px; padding: 12px; border: 1px solid var(--cf-line); border-radius: 16px;
+    background: linear-gradient(180deg, rgba(4,26,43,.88), rgba(1,9,17,.94));
+    box-shadow: inset 0 0 36px rgba(46,230,224,.07), 0 18px 42px rgba(0,0,0,.38);
+  }
+  .connect-columns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--cf-gap); margin-bottom: 9px; }
+  .drop-btn {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    min-width: 0; min-height: 50px; padding: 6px 2px 15px; border-radius: 999px;
+    background: linear-gradient(180deg, rgba(8,60,82,.8), rgba(2,18,31,.94));
+    color: var(--cf-you); border-color: rgba(46,230,224,.26); box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .drop-btn::before {
+    content: ""; width: 13px; height: 13px; border-right: 3px solid currentColor; border-bottom: 3px solid currentColor;
+    transform: rotate(45deg); margin-top: -7px; filter: drop-shadow(0 0 7px currentColor);
+  }
+  .drop-btn::after {
+    content: attr(data-label); position: absolute; left: 4px; right: 4px; bottom: 5px;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    color: var(--cf-muted); font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: uppercase;
+  }
+  .drop-btn:hover:not(:disabled), .drop-btn:focus-visible, .drop-btn.selected {
+    border-color: var(--cf-line-strong); background: linear-gradient(180deg, rgba(11,95,122,.9), rgba(3,28,46,.96));
+    box-shadow: 0 0 18px var(--cf-you-soft), inset 0 1px 0 rgba(255,255,255,.1);
+  }
+  .drop-btn:focus-visible { outline: 2px solid var(--cf-you); outline-offset: 2px; }
+  .drop-btn.win-now { color: #f9fdff; background: linear-gradient(180deg, rgba(24,183,180,.92), rgba(5,71,91,.96)); border-color: var(--cf-you); }
+  .drop-btn.block-now { color: #fff5d7; border-color: rgba(246,173,45,.72); box-shadow: 0 0 16px var(--cf-opp-soft), inset 0 1px 0 rgba(255,255,255,.1); }
+  .drop-btn:disabled { opacity: .34; cursor: not-allowed; filter: saturate(.6); }
+  .connect-board-shell {
+    position: relative; padding: 10px; border-radius: 16px; border: 1px solid rgba(46,230,224,.36);
+    background:
+      linear-gradient(145deg, rgba(12,79,106,.94), rgba(3,22,37,.98) 62%),
+      var(--cf-bg);
+    box-shadow: inset 0 0 24px rgba(0,0,0,.58), 0 20px 46px rgba(0,0,0,.34);
+  }
+  .connect-board-shell::before {
+    content: ""; position: absolute; inset: 8px; pointer-events: none; border-radius: 12px;
+    background: linear-gradient(110deg, rgba(255,255,255,.10), transparent 18%, transparent 82%, rgba(46,230,224,.09));
+    opacity: .7;
+  }
+  .connect-board {
+    position: relative; z-index: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--cf-gap); width: 100%; max-width: 560px; margin: 0 auto;
+  }
+  .connect-cell {
+    position: relative; aspect-ratio: 1; min-width: 0; border-radius: 50%;
+    background:
+      radial-gradient(circle at 42% 34%, rgba(31,79,105,.62), transparent 28%),
+      radial-gradient(circle at 50% 55%, #020b15 0 56%, #12384f 72%, #1c6380 100%);
+    box-shadow: inset 0 8px 14px rgba(0,0,0,.74), inset 0 -2px 6px rgba(255,255,255,.08), 0 0 0 1px rgba(255,255,255,.05);
+    overflow: visible; user-select: none; touch-action: manipulation;
+  }
+  .connect-cell.playable { cursor: pointer; }
+  .connect-cell.preview::after {
+    content: ""; position: absolute; inset: 10%; border-radius: 50%; border: 2px dashed rgba(46,230,224,.72);
+    box-shadow: 0 0 16px var(--cf-you-soft); opacity: .92; pointer-events: none;
+  }
+  .connect-cell.danger-preview::after { border-color: rgba(246,173,45,.78); box-shadow: 0 0 16px var(--cf-opp-soft); }
+  .connect-token {
+    position: absolute; inset: 6%; border-radius: 50%; z-index: 2;
+    box-shadow: inset 0 4px 10px rgba(255,255,255,.24), inset 0 -12px 18px rgba(0,0,0,.38), 0 0 18px rgba(255,255,255,.08);
+  }
+  .connect-cell.you .connect-token { background: radial-gradient(circle at 34% 24%, #c8ffff 0 10%, #2ee6e0 31%, #047a8e 78%); box-shadow: 0 0 20px var(--cf-you-soft), inset 0 4px 10px rgba(255,255,255,.26), inset 0 -12px 18px rgba(0,0,0,.38); }
+  .connect-cell.opponent .connect-token { background: radial-gradient(circle at 34% 24%, #fff4bd 0 10%, #f6ad2d 31%, #b75d05 78%); box-shadow: 0 0 20px var(--cf-opp-soft), inset 0 4px 10px rgba(255,255,255,.26), inset 0 -12px 18px rgba(0,0,0,.38); }
+  .connect-token::before {
+    content: ""; position: absolute; inset: 11%; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.17); box-shadow: inset 0 0 8px rgba(0,0,0,.16);
+  }
+  .connect-token::after {
+    content: ""; position: absolute; inset: 31% 26% 34%; opacity: .34; background: rgba(255,255,255,.78);
+    clip-path: polygon(0 72%, 17% 39%, 36% 61%, 50% 19%, 64% 61%, 83% 39%, 100% 72%, 100% 100%, 0 100%);
+  }
+  .connect-cell.last .connect-token { outline: 2px solid rgba(255,255,255,.82); outline-offset: -5px; }
+  .connect-cell.drop-in .connect-token { animation: connectDrop .44s cubic-bezier(.2,.84,.2,1.16) both; }
+  .connect-cell.win .connect-token { animation: connectWin .95s ease-in-out infinite alternate; }
+  .connect-board.win { animation: connectBoardWin 1.2s ease-in-out infinite alternate; }
+  @keyframes connectDrop { 0% { transform: translateY(-420%) scale(.82); filter: brightness(1.3); } 72% { transform: translateY(7%) scale(1.04); } 100% { transform: translateY(0) scale(1); filter: brightness(1); } }
+  @keyframes connectWin { from { transform: scale(1); filter: brightness(1); } to { transform: scale(1.1); filter: brightness(1.36); } }
+  @keyframes connectBoardWin { from { box-shadow: 0 0 0 rgba(46,230,224,0); } to { box-shadow: 0 0 28px rgba(46,230,224,.28); } }
+  .connect-end {
+    margin-top: 12px; min-height: 78px; border: 1px solid rgba(46,230,224,.5); border-radius: 14px;
+    background:
+      radial-gradient(circle at 14% 45%, rgba(46,230,224,.16), transparent 24%),
+      radial-gradient(circle at 86% 45%, rgba(246,173,45,.14), transparent 24%),
+      linear-gradient(180deg, rgba(8,57,78,.86), rgba(2,17,30,.96));
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    box-shadow: 0 0 24px rgba(46,230,224,.15), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .connect-end strong { color: #f5fbff; font-size: 28px; letter-spacing: 0; font-family: Impact, 'Arial Black', sans-serif; font-weight: 400; }
+  .connect-end span { color: var(--cf-muted); font-size: 12px; letter-spacing: 0; text-transform: uppercase; margin-top: 3px; }
+  .connect-end.lose { border-color: rgba(255,91,81,.58); box-shadow: 0 0 24px rgba(255,91,81,.12), inset 0 1px 0 rgba(255,255,255,.08); }
+  .connect-end.draw { border-color: rgba(145,169,186,.5); }
+  .connect-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .connect-actions button { min-width: 0; }
+  .connect-actions .solo-restart { grid-column: span 2; }
   .disc-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
-  .disc-dot.A { background: #ffcf52; box-shadow: 0 0 10px rgba(255,179,71,.6); }
-  .disc-dot.B { background: var(--sonar); box-shadow: 0 0 10px rgba(52,231,196,.6); }
+  .disc-dot.you { background: var(--cf-you); box-shadow: 0 0 10px var(--cf-you-soft); }
+  .disc-dot.opponent { background: var(--cf-opp); box-shadow: 0 0 10px var(--cf-opp-soft); }
 
   /* Ultimate TTT */
   .uttt-panel { overflow: hidden; }
@@ -712,14 +863,44 @@
   body.is-phone #placement .grid { max-width: 430px; }
   body.is-phone .cell { border-radius: 3px; }
   body.is-phone .ship-row { min-height: 54px; }
+  body.is-phone .connect-panel { --cf-gap: 5px; }
+  body.is-phone .connect-rail { grid-template-columns: 1fr 72px 1fr; gap: 6px; min-height: 84px; }
+  body.is-phone .connect-player {
+    flex-direction: column; justify-content: center; text-align: center;
+    padding: 7px 4px; gap: 5px;
+  }
+  body.is-phone .connect-player.opponent { justify-content: center; text-align: center; }
+  body.is-phone .cf-mini-disc { width: 32px; height: 32px; flex-basis: 32px; }
+  body.is-phone .connect-player-text strong { font-size: 12px; max-width: 100%; }
+  body.is-phone .connect-player-text span { display: none; }
+  body.is-phone .connect-turn strong { font-size: 16px; }
   body.is-phone .connect-stage { padding: 8px; margin-inline: -4px; }
-  body.is-phone .connect-columns, body.is-phone .connect-board { gap: 5px; }
-  body.is-phone .connect-board { padding: 8px; }
-  body.is-phone .drop-btn { font-size: 22px; padding-block: 10px; }
+  body.is-phone .connect-board-shell { padding: 8px; }
+  body.is-phone .drop-btn { min-height: 52px; }
+  body.is-phone .connect-actions { grid-template-columns: 1fr 1fr; }
+  body.is-phone .connect-actions .solo-restart { grid-column: span 1; }
   body.is-phone .toast { width: min(92vw, 420px); text-align: center; bottom: calc(env(safe-area-inset-bottom) + 18px); }
   body.is-phone.needs-landscape .orientation-note.landscape-required,
   body.is-phone.needs-portrait .orientation-note.portrait-recommended { display: block; }
   body.is-phone.needs-landscape:not(.is-landscape) .orientation-note.landscape-required { display: block; border-color: var(--fire); color: #ffd6d2; background: rgba(255,91,81,.12); }
+
+  @media (max-width: 520px) {
+    .connect-panel { --cf-gap: 5px; }
+    .connect-rail { grid-template-columns: 1fr 72px 1fr; gap: 6px; min-height: 84px; }
+    .connect-player {
+      flex-direction: column; justify-content: center; text-align: center;
+      padding: 7px 4px; gap: 5px;
+    }
+    .connect-player.opponent { justify-content: center; text-align: center; }
+    .cf-mini-disc { width: 32px; height: 32px; flex-basis: 32px; }
+    .connect-player-text strong { font-size: 12px; max-width: 100%; }
+    .connect-player-text span { display: none; }
+    .connect-stage { padding: 8px; margin-inline: -4px; }
+    .connect-board-shell { padding: 8px; }
+    .drop-btn { min-height: 52px; }
+    .connect-actions { grid-template-columns: 1fr 1fr; }
+    .connect-actions .solo-restart { grid-column: span 1; }
+  }
 
   @media (hover: none), (pointer: coarse) {
     :root { --grid-gap: 3px; }
@@ -730,7 +911,8 @@
     body { --page-pad: 24px; }
     .wrap { max-width: 1040px; }
     .card { padding: 22px; }
-    .connect-panel, #placement.card, #home.card, #lobby.card { max-width: 620px; margin-left: auto; margin-right: auto; }
+    .connect-panel { max-width: 760px; margin-left: auto; margin-right: auto; }
+    #placement.card, #home.card, #lobby.card { max-width: 620px; margin-left: auto; margin-right: auto; }
     .uno-opponents { max-width: 620px; width: 100%; margin: 0 auto; }
     #oneCard .battle-dock { max-width: 720px; width: 100%; margin: 0 auto; }
   }
@@ -745,6 +927,7 @@
     body.is-phone #placement.card, body.is-phone #connectFour.card { max-width: none; }
     body.is-phone #placement .grid { width: min(42vw, calc(100dvh - 86px)); }
     body.is-phone .connect-stage { max-width: min(82vw, 680px); margin-left: auto; margin-right: auto; }
+    body.is-phone .connect-rail, body.is-phone .connect-actions { max-width: min(82vw, 680px); margin-left: auto; margin-right: auto; }
   }
 
   .hidden { display: none !important; }
@@ -836,16 +1019,43 @@
     <div class="orientation-note portrait-recommended">Portrait is recommended for Connect Four with larger column drop buttons.</div>
     <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
     <div id="connectStatus" class="status">...</div>
+    <div class="connect-rail" id="connectRail">
+      <div class="connect-player you" id="connectYouPanel">
+        <span class="cf-mini-disc you"></span>
+        <div class="connect-player-text">
+          <strong id="connectYouName">You</strong>
+          <span>Cyan command</span>
+        </div>
+      </div>
+      <div class="connect-turn" id="connectTurnBadge">
+        <span>Turn</span>
+        <strong id="connectTurnText">You</strong>
+        <i aria-hidden="true"></i>
+      </div>
+      <div class="connect-player opponent" id="connectOpponentPanel">
+        <div class="connect-player-text">
+          <strong id="connectOpponentName">Opponent</strong>
+          <span>Amber command</span>
+        </div>
+        <span class="cf-mini-disc opponent"></span>
+      </div>
+    </div>
     <div class="connect-stage">
       <div class="connect-columns" id="connectColumns"></div>
-      <div class="connect-board" id="connectBoard"></div>
+      <div class="connect-board-shell">
+        <div class="connect-board" id="connectBoard"></div>
+      </div>
     </div>
-    <div class="connect-legend">
-      <span><span class="disc-dot A"></span>You</span>
-      <span><span class="disc-dot B"></span>Opponent</span>
+    <div id="connectEndBanner" class="connect-end hidden">
+      <strong id="connectEndTitle">Victory</strong>
+      <span id="connectEndSub">Four in a row</span>
     </div>
-    <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
-    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+    <div class="connect-actions">
+      <button class="ghost" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost" onclick="leaveGame()">Leave</button>
+    </div>
   </section>
 
 
