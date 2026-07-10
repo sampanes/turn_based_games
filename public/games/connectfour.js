@@ -125,6 +125,8 @@ const connectfour = {
       board: freshBoard(),
       lastMove: null,
       winningCells: [],
+      moveNumber: 0,
+      log: [],
     };
   },
 
@@ -139,6 +141,18 @@ const connectfour = {
 
     const line = winningLine(state.board, dropped.r, dropped.c, who);
     state.lastMove = { by: who, r: dropped.r, c: dropped.c };
+    // Rolling move log so clients can replay and pace every drop since their
+    // last poll (solo bots resolve inside the same call as the human move).
+    state.moveNumber = (state.moveNumber || 0) + 1;
+    state.log = (state.log || []).slice(-15);
+    state.log.push({
+      n: state.moveNumber,
+      by: who,
+      r: dropped.r,
+      c: dropped.c,
+      win: line ? line.slice() : null,
+      draw: !line && legalMoves(state.board).length === 0,
+    });
     if (line) {
       state.phase = 'over';
       state.winner = who;
@@ -165,6 +179,8 @@ const connectfour = {
       legalMoves: state.phase === 'battle' ? legalMoves(state.board) : [],
       lastMove: state.lastMove,
       winningCells: state.winningCells || [],
+      moveNumber: state.moveNumber || 0,
+      moveLog: (state.log || []).slice(),
     };
   },
 };

@@ -874,6 +874,7 @@ function renderBattle(d, v) {
         battleIncomingHoldUntil = Date.now() + 900;
         if (lastView) renderBattle(d, lastView);
         shotFx($('fireGrid'), r, c, result, sunkShip ? sunkShip.cells : null);
+        if (sunkShip && lastView && lastView.phase !== 'over') toast(`Enemy ${sunkShip.name} destroyed!`);
       });
     } else {
       pendingOutgoing = null;
@@ -895,9 +896,10 @@ function renderBattle(d, v) {
   $('battle').classList.toggle('your-turn', yourTurn);
   $('fireGrid').classList.toggle('ready-to-fire', yourTurn);
 
-  // while an animation conceals a shot, do not spoil a sink it just caused
+  // while an animation conceals a shot, do not spoil a sink it just caused;
+  // an incoming shot stays hidden through the pre-sweep hold as well
   const concealedOutKey = concealOutgoing ? `${concealOutgoing.r},${concealOutgoing.c}` : null;
-  const concealedInKey = concealIncoming && shot ? `${shot.r},${shot.c}` : null;
+  const concealedInKey = (concealIncoming || incomingHeld) && shot ? `${shot.r},${shot.c}` : null;
   const enemySunkCells = new Set();
   const enemyRevealCells = new Set();
   (v.enemyFleet || []).forEach(s => {
@@ -930,7 +932,7 @@ function renderBattle(d, v) {
     const c = +cell.dataset.c;
     const key = `${r},${c}`;
     const rawSq = v.myBoard[r][c];
-    const hideShot = concealIncoming && shot && shot.r === r && shot.c === c;
+    const hideShot = concealedInKey === key;
     const sq = hideShot ? { ...rawSq, shot: null } : rawSq;
     let cls = 'cell';
     if (sq.shot === 'hit') cls += ' hit incoming-hit';
@@ -943,10 +945,16 @@ function renderBattle(d, v) {
     cell.setAttribute('aria-label', sq.shot ? `Opponent ${sq.shot} on your ${shipText} at ${coordLabel(r, c)}` : `Your ${shipText} at ${coordLabel(r, c)}`);
   });
 
-  if (!animating) {
-    renderFleetStrip($('enemyFleetStrip'), v.enemyFleet, false);
-    renderFleetStrip($('myFleetStrip'), v.myFleet, true);
-  }
+  // fleet strips update immediately; hide only a sink still concealed by a
+  // running shot animation so the strip cannot spoil the impact
+  const stripEnemy = (v.enemyFleet || []).map(s =>
+    (s.sunk && concealedOutKey && s.cells && s.cells.includes(concealedOutKey)) ? { ...s, sunk: false } : s);
+  const stripMine = (v.myFleet || []).map(s => {
+    if (!concealedInKey || shot.result !== 'hit' || !s.cells || !s.cells.includes(concealedInKey)) return s;
+    return { ...s, sunk: false, hits: Math.max(0, (s.hits || 0) - 1) };
+  });
+  renderFleetStrip($('enemyFleetStrip'), stripEnemy, false);
+  renderFleetStrip($('myFleetStrip'), stripMine, true);
 
   const banner = $('statusBanner');
   if (v.phase === 'over' && animating) {

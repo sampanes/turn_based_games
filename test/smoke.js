@@ -238,6 +238,16 @@ async function main() {
     });
     assert.strictEqual(connectMove.status, 200);
 
+    const connectAfterMove = await request(port, 'GET', `/api/state?room=${connectCreated.data.room}`, null, {
+      Authorization: `Bearer ${connectCreated.data.token}`,
+    });
+    assert.strictEqual(connectAfterMove.status, 200);
+    assert.strictEqual(connectAfterMove.data.view.moveNumber, 1);
+    assert.deepStrictEqual(
+      connectAfterMove.data.view.moveLog.map(entry => [entry.n, entry.by, entry.r, entry.c, entry.win, entry.draw]),
+      [[1, 'A', 5, 3, null, false]],
+    );
+
     const botCreated = await request(port, 'POST', '/api/create', {
       game: 'connectfour',
       name: 'Human',
