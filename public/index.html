@@ -85,6 +85,16 @@
   .mt { margin-top: 14px; }
   .divider { text-align: center; color: var(--mute); font-size: 11px; letter-spacing: 3px; margin: 18px 0 4px; }
 
+  /* resume saved game */
+  .resume-card {
+    border: 1px solid rgba(255,179,71,.5); border-radius: 12px; padding: 12px;
+    margin-bottom: 16px; background: linear-gradient(180deg, rgba(255,179,71,.10), rgba(255,179,71,.04));
+  }
+  .resume-card strong { display: block; color: var(--amber); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+  .resume-card span { color: var(--ink); font-size: 14px; }
+  .resume-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .resume-actions button { flex: 1; }
+
   /* code share */
   .code-badge {
     text-align: center; font-family: Impact, 'Arial Black', sans-serif; font-size: 52px; letter-spacing: 10px;
@@ -1088,6 +1098,14 @@
 
   <!-- HOME -->
   <section id="home" class="card hidden">
+    <div id="resumeCard" class="resume-card hidden">
+      <strong>Game in progress</strong>
+      <span id="resumeText">...</span>
+      <div class="resume-actions">
+        <button class="primary" onclick="resumeSavedGame()">Resume</button>
+        <button class="ghost" onclick="discardSavedGame()">Discard</button>
+      </div>
+    </div>
     <h2>New engagement</h2>
     <label for="gameSelect">Game</label>
     <select id="gameSelect"></select>

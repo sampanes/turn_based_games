@@ -68,6 +68,7 @@ function show(id) {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
   });
+  if (id === 'home') updateResumeCard();
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -179,6 +180,41 @@ async function joinGame() {
     enterRoom();
   } catch (e) { toast(e.message); }
 }
+function sectionForGame(gameId) {
+  const meta = gameMeta(gameId);
+  const ui = (meta && meta.ui) || '';
+  return ui === 'connectfour' ? 'connectFour'
+    : ui === 'dotsboxes' ? 'dotsBoxes'
+    : ui === 'onecard' ? 'oneCard'
+    : ui === 'mancala' ? 'mancala'
+    : ui === 'ultimatettt' ? 'ultimateTTT'
+    : 'battle';
+}
+
+function updateResumeCard() {
+  const card = $('resumeCard');
+  if (!card) return;
+  const saved = session || loadSession();
+  if (!saved || !saved.room) { card.classList.add('hidden'); return; }
+  const meta = gameMeta(saved.game);
+  const modeText = saved.mode === 'computer' ? 'offline vs computer' : saved.bot ? 'vs Botty' : 'live room';
+  $('resumeText').textContent = `${(meta && meta.name) || saved.game || 'Game'} - ${modeText} - room ${saved.room}`;
+  card.classList.remove('hidden');
+}
+
+function resumeSavedGame() {
+  session = session || loadSession();
+  if (!session || !session.room) { updateResumeCard(); return; }
+  show(sectionForGame(session.game));
+  enterRoom();
+}
+
+function discardSavedGame() {
+  if (!confirm('Discard the saved game? The room code and seat are forgotten on this device.')) return;
+  clearSession();
+  updateResumeCard();
+}
+
 function leaveGame() {
   if (!confirm('Leave this game? This clears the saved local session for this device.')) return;
   clearSession();
@@ -2570,14 +2606,21 @@ populateGameSelect();
 const params = launchParams();
 applyLaunchGame(params.game);
 session = loadSession();
-// A deliberate launch link outranks a leftover session for another game;
-// without this, one stale saved room swallows every landing-page button.
-if (session && params.mode === 'computer' && params.game && gameMeta(params.game)
-    && !(session.mode === 'computer' && session.game === params.game)) {
+// The home screen is always the landing page. A saved session becomes a
+// Resume card there instead of auto-teleporting into the old game; only an
+// explicit ?mode=computer&game=x launch link jumps straight into play.
+const launchGame = params.mode === 'computer' && params.game && gameMeta(params.game) ? params.game : null;
+if (session && launchGame && !(session.mode === 'computer' && session.game === launchGame)) {
   clearSession();
 }
-if (session) { show('battle'); enterRoom(); clearLaunchParams(); }
-else if (params.mode === 'computer') {
+if (session && launchGame) {
+  show(sectionForGame(session.game));
+  enterRoom();
+  clearLaunchParams();
+} else if (!session && params.mode === 'computer') {
   show('home');
   createComputerGame().finally(clearLaunchParams);
-} else show('home');
+} else {
+  show('home');
+  clearLaunchParams();
+}
