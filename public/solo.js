@@ -22,13 +22,28 @@
     return room.game.computerMove(room.state, slot);
   }
 
+  // The computer "thinks" between moves instead of answering inside the same
+  // call as the human move: the first call only arms a timer, and later polls
+  // apply at most one bot move each once its delay has elapsed. Multi-bot
+  // games (UNO) therefore play out one visible move per poll.
+  function botThinkDelay() { return 600 + Math.floor(Math.random() * 500); }
+
+  function botOnTurn(room) {
+    return room.state.phase === 'battle' && room.state.turn && room.state.turn !== 'A';
+  }
+
   function advanceComputer(room) {
     let guard = 0;
-    while (room.state.phase === 'battle' && room.state.turn && room.state.turn !== 'A' && guard++ < 40) {
+    const now = Date.now();
+    while (botOnTurn(room) && guard++ < 40) {
+      if (!Number.isFinite(room.botReadyAt)) { room.botReadyAt = now + botThinkDelay(); return; }
+      if (room.botReadyAt > now) return;
       const move = computerMove(room, room.state.turn);
       if (!move) break;
       room.game.applyMove(room.state, room.state.turn, move, publicPlayers(room));
+      room.botReadyAt = null;
     }
+    room.botReadyAt = null;
   }
 
   function createRoom(body, helpers) {

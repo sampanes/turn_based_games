@@ -345,6 +345,7 @@ function resetGameUi() {
     mncLastPits = null; mncLastMoveNumber = 0; mncBoardSig = ''; mncAnimating = false; mncOverFxDone = false;
   }
   if ($('utttBoard')) $('utttBoard').innerHTML = '';
+  utttUi = { lastMove: null, seen: false };
   $('oneCardOpponents').innerHTML = '';
   resetOneCardHandUi();
   $('oneCardHand').innerHTML = '';
@@ -2493,10 +2494,22 @@ async function moveMancala(pitIdx) {
 }
 
 // ---------------- Ultimate TTT ----------------
+let utttUi = { lastMove: null, seen: false };
+
+function utttSfx(mine) {
+  if (!battleFxOn) return;
+  const audio = mncEnsureAudio();
+  if (!audio || audio.state !== 'running') return;
+  const t = audio.currentTime;
+  battleTone(audio, t, mine ? 640 : 420, 0.07, { type: 'triangle', gain: 0.05 });
+  battleTone(audio, t + 0.05, mine ? 860 : 560, 0.06, { type: 'triangle', gain: 0.04 });
+}
+
 function renderUltimateTTT(d, v) {
   const EMPTY = 0, X = 1, O = 2, DRAW = 3;
   const board = $('utttBoard');
   const validSet = new Set(v.validMoves || []);
+  const newMove = utttUi.seen && v.lastMove !== null && v.lastMove !== utttUi.lastMove;
 
   board.innerHTML = '';
   for (let mini = 0; mini < 9; mini++) {
@@ -2524,7 +2537,8 @@ function renderUltimateTTT(d, v) {
         cell.className = 'uttt-cell'
           + (val === X ? ' X' : val === O ? ' O' : '')
           + (isValid ? ' valid' : '')
-          + (isLast ? ' last' : '');
+          + (isLast ? ' last' : '')
+          + (isLast && newMove ? ' pop' : '');
         if (val === X) cell.textContent = 'X';
         else if (val === O) cell.textContent = 'O';
         if (isValid) cell.onclick = () => moveUltimateTTT(idx);
@@ -2535,12 +2549,19 @@ function renderUltimateTTT(d, v) {
     if (miniWinner !== EMPTY) {
       const ov = document.createElement('div');
       ov.className = 'uttt-mini-winner';
-      ov.textContent = miniWinner === X ? 'X' : miniWinner === O ? 'O' : '—';
+      ov.textContent = miniWinner === X ? 'X' : miniWinner === O ? 'O' : '-';
       miniEl.appendChild(ov);
     }
 
     board.appendChild(miniEl);
   }
+
+  if (newMove) {
+    const mineJustPlayed = v.board[v.lastMove] === (v.myPiece === 'X' ? X : O);
+    utttSfx(mineJustPlayed);
+    battleVibrate(mineJustPlayed ? 8 : 14);
+  }
+  utttUi = { lastMove: v.lastMove, seen: true };
 
   const banner = $('utttStatus');
   if (v.phase === 'over') {

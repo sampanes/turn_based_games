@@ -620,6 +620,11 @@
   .uttt-cell.valid:hover { background: rgba(52,231,196,.2); }
   .uttt-cell.valid:active { background: rgba(52,231,196,.3); transform: scale(.93); }
   .uttt-cell.last { outline: 2px solid rgba(255,255,255,.5); outline-offset: -3px; }
+  .uttt-cell.pop { animation: utttPop .32s cubic-bezier(.2,.9,.3,1.35); }
+  @keyframes utttPop {
+    from { transform: scale(.25); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
   .uttt-mini-winner {
     position: absolute; inset: 0; z-index: 2;
     display: flex; align-items: center; justify-content: center;
