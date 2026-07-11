@@ -47,6 +47,126 @@
     return { board: b2, miniWinners: mw2 };
   }
 
+  // ------------------------------------------------------------------
+  // Champion neural bot (browser only).
+  // The certified strongest net from the ultimate-ttt-RL project, fetched
+  // cross-origin from its GitHub Pages so both sites share one model:
+  //   https://sampanes.github.io/ultimate-ttt-RL/  (CHAMPIONS.md, RESULT_M2_5.md)
+  // onnxruntime-web is injected from CDN on first solo game. Until the model
+  // is ready -- or if anything fails, or offline -- the win/block heuristic
+  // below keeps playing, so solo mode never depends on the network.
+  // The brain is async but computerMove must return synchronously: it returns
+  // null while a result is computing (the solo poll loop re-arms and retries)
+  // and hands back the cached answer on a later poll.
+  // ------------------------------------------------------------------
+
+  const MODELS_BASE = 'https://sampanes.github.io/ultimate-ttt-RL/models/';
+  const ORT_CDN = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+
+  const brain = { status: 'idle', session: null, policyName: 'policy_logits', pendingKey: null, answer: null };
+
+  function brainUsable() {
+    return typeof window !== 'undefined' && typeof fetch === 'function';
+  }
+
+  function loadOrtScript() {
+    return new Promise((resolve, reject) => {
+      if (window.ort) return resolve();
+      const s = document.createElement('script');
+      s.src = ORT_CDN + 'ort.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('onnxruntime-web script failed to load'));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function brainInit() {
+    brain.status = 'loading';
+    try {
+      await loadOrtScript();
+      const cfgUrl = MODELS_BASE + 'champion_config.json';
+      const resp = await fetch(cfgUrl);
+      if (!resp.ok) throw new Error('config HTTP ' + resp.status);
+      const config = await resp.json();
+      if (config.outputs && config.outputs.policy) brain.policyName = config.outputs.policy;
+      window.ort.env.wasm.wasmPaths = ORT_CDN;
+      brain.session = await window.ort.InferenceSession.create(
+        new URL(config.file, cfgUrl).href,
+        { executionProviders: ['wasm'], graphOptimizationLevel: 'all' }
+      );
+      brain.status = 'ready';
+    } catch (err) {
+      brain.status = 'failed'; // heuristic takes over permanently this session
+    }
+  }
+
+  function stateKey(state) {
+    return state.board.join('') + '|' + state.turn + '|' + state.lastMove;
+  }
+
+  // Mirrors the training repo's input encoding (7x9x9 planes, NCHW):
+  // X pieces, O pieces, side-to-move, legal mask, mini winners, last move, bias.
+  function buildInputTensor(state, valid) {
+    const data = new Float32Array(7 * 81);
+    for (let i = 0; i < 81; i++) {
+      if (state.board[i] === X) data[i] = 1.0;
+      else if (state.board[i] === O) data[81 + i] = 1.0;
+    }
+    data.fill(state.turn === 'A' ? 1.0 : -1.0, 162, 243);
+    for (const c of valid) data[243 + c] = 1.0;
+    for (let m = 0; m < 9; m++) {
+      const w = state.miniWinners[m];
+      if (w === X || w === O) {
+        const v = (w === X) ? 1.0 : -1.0;
+        for (const c of getMiniIndices(m)) data[324 + c] = v;
+      }
+    }
+    if (state.lastMove !== null && state.lastMove >= 0) data[405 + state.lastMove] = 1.0;
+    data.fill(1.0, 486, 567);
+    return new window.ort.Tensor('float32', data, [1, 7, 9, 9]);
+  }
+
+  // 1-ply tactical pool, mirroring the certified "tactical" mode the champion
+  // was benchmarked in: take an immediate game win if one exists; otherwise
+  // exclude moves that hand the opponent an immediate game win (falling back
+  // to all legal moves if everything loses). The net picks within the pool.
+  function tacticalPool(state, valid, myPiece, oppPiece) {
+    const wins = [];
+    for (const idx of valid) {
+      const sim = simPlace(state.board, state.miniWinners, idx, myPiece);
+      if (checkUltimateWin(sim.miniWinners) === myPiece) wins.push(idx);
+    }
+    if (wins.length) return wins;
+    const safe = [];
+    for (const idx of valid) {
+      const sim = simPlace(state.board, state.miniWinners, idx, myPiece);
+      if (checkUltimateWin(sim.miniWinners) !== null) { safe.push(idx); continue; }
+      let losing = false;
+      for (const r of validMoves(sim.board, idx, sim.miniWinners)) {
+        const sim2 = simPlace(sim.board, sim.miniWinners, r, oppPiece);
+        if (checkUltimateWin(sim2.miniWinners) === oppPiece) { losing = true; break; }
+      }
+      if (!losing) safe.push(idx);
+    }
+    return safe.length ? safe : valid;
+  }
+
+  async function brainCompute(state, key, valid, myPiece, oppPiece) {
+    try {
+      const input = buildInputTensor(state, valid);
+      const results = await brain.session.run({ input });
+      const logits = results[brain.policyName].data;
+      const pool = tacticalPool(state, valid, myPiece, oppPiece);
+      let best = pool[0];
+      for (const idx of pool) if (logits[idx] > logits[best]) best = idx;
+      brain.answer = { key, idx: best };
+    } catch (err) {
+      brain.status = 'failed';
+    } finally {
+      brain.pendingKey = null;
+    }
+  }
+
   const ultimatettt = {
     meta: {
       id: 'ultimatettt',
@@ -124,6 +244,26 @@
       const oppPiece = who === 'A' ? O : X;
       const valid = validMoves(state.board, state.lastMove, state.miniWinners);
       if (!valid.length) return null;
+      if (valid.length === 1) return { idx: valid[0] };
+
+      // Champion net first (browser). While it computes, return null so the
+      // poll loop retries; while it loads (or if it failed), play heuristic.
+      if (brainUsable()) {
+        if (brain.status === 'idle') brainInit();
+        if (brain.status === 'ready') {
+          const key = stateKey(state);
+          if (brain.answer && brain.answer.key === key) {
+            const idx = brain.answer.idx;
+            brain.answer = null;
+            return { idx };
+          }
+          if (brain.pendingKey !== key) {
+            brain.pendingKey = key;
+            brainCompute(state, key, valid, myPiece, oppPiece);
+          }
+          return null;
+        }
+      }
 
       const winsGame = (idx, piece) => {
         const { miniWinners: mw } = simPlace(state.board, state.miniWinners, idx, piece);
