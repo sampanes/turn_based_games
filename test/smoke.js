@@ -120,6 +120,23 @@ function testMancalaMoveIdentity() {
   assert.deepStrictEqual(log[0].seq, [3, 4, 5, 6]);
 }
 
+function testDotsBoxesScoring() {
+  const dots = require('../public/games/dotsboxes');
+  const state = dots.init();
+  assert.strictEqual(dots.viewFor(state, 'A').legalMoves.length, 40);
+  assert.strictEqual(dots.applyMove(state, 'A', { type: 'h', r: 0, c: 0 }), null);
+  assert.strictEqual(state.turn, 'B');
+  assert.strictEqual(dots.applyMove(state, 'B', { type: 'h', r: 1, c: 0 }), null);
+  assert.strictEqual(state.turn, 'A');
+  assert.strictEqual(dots.applyMove(state, 'A', { type: 'v', r: 0, c: 0 }), null);
+  assert.strictEqual(state.turn, 'B');
+  assert.strictEqual(dots.applyMove(state, 'B', { type: 'v', r: 0, c: 1 }), null);
+  assert.strictEqual(state.scores.B, 1);
+  assert.strictEqual(state.turn, 'B');
+  assert.deepStrictEqual(state.lastMove.completed, ['0,0']);
+  assert.strictEqual(dots.viewFor(state, 'B').legalMoves.length, 36);
+}
+
 function fleet() {
   return [
     { name: 'Carrier', cells: ['0,0', '0,1', '0,2', '0,3', '0,4'] },
@@ -133,6 +150,7 @@ function fleet() {
 async function main() {
   testUnoTurnSyncAndSorting();
   testMancalaMoveIdentity();
+  testDotsBoxesScoring();
   try { fs.unlinkSync(dataFile); } catch {}
   fs.writeFileSync(dataFile, JSON.stringify({
     rooms: {
@@ -248,6 +266,37 @@ async function main() {
       [[1, 'A', 5, 3, null, false]],
     );
 
+    const dotsCreated = await request(port, 'POST', '/api/create', { game: 'dotsboxes', name: 'Dot' });
+    assert.strictEqual(dotsCreated.status, 200);
+    assert.strictEqual(dotsCreated.data.game, 'dotsboxes');
+
+    const dotsJoined = await request(port, 'POST', '/api/join', { room: dotsCreated.data.room, name: 'Box' });
+    assert.strictEqual(dotsJoined.status, 200);
+
+    const dotsState = await request(port, 'GET', `/api/state?room=${dotsCreated.data.room}`, null, {
+      Authorization: `Bearer ${dotsCreated.data.token}`,
+    });
+    assert.strictEqual(dotsState.status, 200);
+    assert.strictEqual(dotsState.data.view.ui, 'dotsboxes');
+    assert.strictEqual(dotsState.data.view.phase, 'battle');
+    assert.strictEqual(dotsState.data.view.legalMoves.length, 40);
+
+    const dotsMove = await request(port, 'POST', '/api/move', {
+      room: dotsCreated.data.room,
+      move: { type: 'h', r: 0, c: 0 },
+    }, {
+      Authorization: `Bearer ${dotsCreated.data.token}`,
+    });
+    assert.strictEqual(dotsMove.status, 200);
+
+    const dotsAfterMove = await request(port, 'GET', `/api/state?room=${dotsCreated.data.room}`, null, {
+      Authorization: `Bearer ${dotsCreated.data.token}`,
+    });
+    assert.strictEqual(dotsAfterMove.status, 200);
+    assert.strictEqual(dotsAfterMove.data.view.moveNumber, 1);
+    assert.strictEqual(dotsAfterMove.data.view.edges.h[0][0], 'A');
+    assert.strictEqual(dotsAfterMove.data.view.turn, 'B');
+
     const botCreated = await request(port, 'POST', '/api/create', {
       game: 'connectfour',
       name: 'Human',
@@ -285,7 +334,7 @@ async function main() {
     assert.strictEqual(botAfterMove.data.view.turn, 'A');
     assert.strictEqual(botAfterMove.data.view.board.flat().filter(Boolean).length, 2);
 
-    for (const game of ['battleship', 'mancala', 'onecard', 'ultimatettt']) {
+    for (const game of ['battleship', 'dotsboxes', 'mancala', 'onecard', 'ultimatettt']) {
       const availableBot = await request(port, 'POST', '/api/create', {
         game,
         name: 'Human',

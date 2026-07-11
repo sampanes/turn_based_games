@@ -448,6 +448,133 @@
   .disc-dot.you { background: var(--cf-you); box-shadow: 0 0 10px var(--cf-you-soft); }
   .disc-dot.opponent { background: var(--cf-opp); box-shadow: 0 0 10px var(--cf-opp-soft); }
 
+  /* dots and boxes */
+  .dots-panel {
+    --dots-bg: #07131c;
+    --dots-panel: rgba(9, 31, 45, .9);
+    --dots-line: rgba(103, 218, 202, .32);
+    --dots-dot: 16px;
+    --dots-you: #56e3c2;
+    --dots-you-soft: rgba(86, 227, 194, .25);
+    --dots-opp: #f0b64d;
+    --dots-opp-soft: rgba(240, 182, 77, .25);
+    --dots-box-min: 42px;
+    position: relative; overflow: hidden;
+    border-color: rgba(103,218,202,.34);
+    background:
+      radial-gradient(circle at 18% 4%, rgba(86,227,194,.18), transparent 28%),
+      radial-gradient(circle at 86% 14%, rgba(240,182,77,.14), transparent 28%),
+      linear-gradient(180deg, rgba(9,31,45,.96), rgba(3,13,22,.96));
+  }
+  .dots-panel::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .2;
+    background-image:
+      linear-gradient(rgba(103,218,202,.1) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(103,218,202,.1) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask: radial-gradient(80% 64% at 50% 36%, #000 0%, transparent 82%);
+  }
+  .dots-panel > * { position: relative; z-index: 1; }
+  .dots-scorebar {
+    display: grid; grid-template-columns: 1fr minmax(88px, 120px) 1fr; gap: 8px;
+    align-items: stretch; margin-top: 12px;
+  }
+  .dots-player, .dots-turn {
+    border: 1px solid var(--dots-line); border-radius: 12px;
+    background: linear-gradient(180deg, rgba(5,23,35,.92), rgba(2,10,18,.94));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 12px 28px rgba(0,0,0,.28);
+  }
+  .dots-player {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    min-width: 0; padding: 10px 12px;
+  }
+  .dots-player.opponent { text-align: right; }
+  .dots-player strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: #f4fbff; }
+  .dots-player span { color: var(--mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0; }
+  .dots-score {
+    flex: 0 0 auto; min-width: 42px; height: 42px; display: grid; place-items: center;
+    border-radius: 10px; font-size: 23px; font-weight: 900;
+  }
+  .dots-player.you .dots-score { color: #032019; background: var(--dots-you); box-shadow: 0 0 18px var(--dots-you-soft); }
+  .dots-player.opponent .dots-score { color: #241604; background: var(--dots-opp); box-shadow: 0 0 18px var(--dots-opp-soft); }
+  .dots-turn { display: grid; place-items: center; padding: 8px; text-align: center; }
+  .dots-turn span { color: var(--mute); font-size: 10px; text-transform: uppercase; letter-spacing: 0; }
+  .dots-turn strong { color: var(--dots-you); font-size: 14px; line-height: 1.15; letter-spacing: 0; }
+  .dots-stage {
+    margin-top: 12px; padding: 14px; border-radius: 16px; border: 1px solid var(--dots-line);
+    background: linear-gradient(180deg, rgba(6,28,42,.9), rgba(2,10,17,.96));
+    box-shadow: inset 0 0 30px rgba(86,227,194,.06), 0 18px 42px rgba(0,0,0,.36);
+  }
+  .dots-board {
+    display: grid; gap: 0; width: min(100%, 500px); aspect-ratio: 1; margin: 0 auto;
+    padding: 8px; border-radius: 14px;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(86,227,194,.08), transparent 62%),
+      rgba(2,10,18,.68);
+    border: 1px solid rgba(103,218,202,.22);
+  }
+  .db-dot {
+    width: var(--dots-dot); height: var(--dots-dot); align-self: center; justify-self: center;
+    border-radius: 50%; background: #e7fbf6;
+    box-shadow: 0 0 14px rgba(231,251,246,.45), inset 0 -2px 4px rgba(0,0,0,.24);
+    z-index: 3;
+  }
+  .db-edge {
+    position: relative; border: 0; min-height: 0; padding: 0; align-self: center; justify-self: center;
+    background: transparent; box-shadow: none; border-radius: 999px; z-index: 2;
+  }
+  .db-edge.h { width: calc(100% + var(--dots-dot)); height: 28px; }
+  .db-edge.v { width: 28px; height: calc(100% + var(--dots-dot)); }
+  .db-edge::before {
+    content: ""; position: absolute; inset: 9px 4px; border-radius: 999px;
+    background: rgba(103,218,202,.14); border: 1px solid rgba(103,218,202,.16);
+    transition: background .12s ease, box-shadow .12s ease, transform .08s ease;
+  }
+  .db-edge.v::before { inset: 4px 9px; }
+  .db-edge.can-play { cursor: pointer; }
+  .db-edge.can-play:hover::before, .db-edge.can-play:focus-visible::before {
+    background: rgba(86,227,194,.5); box-shadow: 0 0 16px var(--dots-you-soft);
+  }
+  .db-edge:focus-visible { outline: 2px solid var(--dots-you); outline-offset: 2px; }
+  .db-edge.claimed.you::before { background: var(--dots-you); border-color: var(--dots-you); box-shadow: 0 0 16px var(--dots-you-soft); }
+  .db-edge.claimed.opponent::before { background: var(--dots-opp); border-color: var(--dots-opp); box-shadow: 0 0 16px var(--dots-opp-soft); }
+  .db-edge.last::before { transform: scale(1.12); filter: brightness(1.25); }
+  .db-edge.scores::after {
+    content: ""; position: absolute; inset: 3px; border: 1px dashed rgba(255,255,255,.48);
+    border-radius: 999px; pointer-events: none; animation: dotsScoreHint 1.1s ease-in-out infinite alternate;
+  }
+  @keyframes dotsScoreHint { from { opacity: .35; } to { opacity: .9; } }
+  .db-box {
+    position: relative; border-radius: 8px; margin: 3px;
+    background: rgba(8,31,46,.42); border: 1px solid rgba(103,218,202,.08);
+    box-shadow: inset 0 0 12px rgba(0,0,0,.24);
+  }
+  .db-box.you {
+    background: linear-gradient(145deg, rgba(86,227,194,.32), rgba(86,227,194,.1));
+    border-color: rgba(86,227,194,.48);
+  }
+  .db-box.opponent {
+    background: linear-gradient(145deg, rgba(240,182,77,.34), rgba(240,182,77,.1));
+    border-color: rgba(240,182,77,.5);
+  }
+  .db-box.completed { animation: dotsBoxPop .55s cubic-bezier(.2,.8,.2,1.18); }
+  @keyframes dotsBoxPop { 0% { transform: scale(.84); filter: brightness(1.5); } 100% { transform: scale(1); filter: brightness(1); } }
+  .dots-last {
+    min-height: 34px; margin-top: 10px; color: var(--mute); font-size: 12px; line-height: 1.4; text-align: center;
+  }
+  .dots-end {
+    margin-top: 12px; min-height: 76px; border-radius: 14px; border: 1px solid rgba(103,218,202,.5);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    background: linear-gradient(180deg, rgba(8,54,66,.84), rgba(2,15,24,.96));
+    box-shadow: 0 0 24px rgba(86,227,194,.15), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .dots-end strong { color: #f5fbff; font-size: 28px; font-family: Impact, 'Arial Black', sans-serif; font-weight: 400; letter-spacing: 0; }
+  .dots-end span { color: var(--mute); font-size: 12px; text-transform: uppercase; letter-spacing: 0; margin-top: 3px; }
+  .dots-end.lose { border-color: rgba(255,91,81,.58); box-shadow: 0 0 24px rgba(255,91,81,.12), inset 0 1px 0 rgba(255,255,255,.08); }
+  .dots-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .dots-actions button { min-width: 0; }
+  .dots-actions .solo-restart { grid-column: span 2; }
+
   /* Ultimate TTT */
   .uttt-panel { overflow: hidden; }
   .uttt-stage {
@@ -879,6 +1006,15 @@
   body.is-phone .drop-btn { min-height: 52px; }
   body.is-phone .connect-actions { grid-template-columns: 1fr 1fr; }
   body.is-phone .connect-actions .solo-restart { grid-column: span 1; }
+  body.is-phone .dots-panel { --dots-dot: 14px; --dots-box-min: 34px; }
+  body.is-phone .dots-scorebar { grid-template-columns: 1fr 78px 1fr; gap: 6px; }
+  body.is-phone .dots-player { flex-direction: column; justify-content: center; text-align: center; padding: 7px 5px; }
+  body.is-phone .dots-player.opponent { text-align: center; }
+  body.is-phone .dots-player span { display: none; }
+  body.is-phone .dots-score { min-width: 34px; height: 34px; font-size: 19px; }
+  body.is-phone .dots-stage { padding: 8px; margin-inline: -4px; }
+  body.is-phone .dots-actions { grid-template-columns: 1fr 1fr; }
+  body.is-phone .dots-actions .solo-restart { grid-column: span 1; }
   body.is-phone .toast { width: min(92vw, 420px); text-align: center; bottom: calc(env(safe-area-inset-bottom) + 18px); }
   body.is-phone.needs-landscape .orientation-note.landscape-required,
   body.is-phone.needs-portrait .orientation-note.portrait-recommended { display: block; }
@@ -900,18 +1036,28 @@
     .drop-btn { min-height: 52px; }
     .connect-actions { grid-template-columns: 1fr 1fr; }
     .connect-actions .solo-restart { grid-column: span 1; }
+    .dots-panel { --dots-dot: 14px; --dots-box-min: 34px; }
+    .dots-scorebar { grid-template-columns: 1fr 78px 1fr; gap: 6px; }
+    .dots-player { flex-direction: column; justify-content: center; text-align: center; padding: 7px 5px; }
+    .dots-player.opponent { text-align: center; }
+    .dots-player span { display: none; }
+    .dots-score { min-width: 34px; height: 34px; font-size: 19px; }
+    .dots-stage { padding: 8px; margin-inline: -4px; }
+    .dots-actions { grid-template-columns: 1fr 1fr; }
+    .dots-actions .solo-restart { grid-column: span 1; }
   }
 
   @media (hover: none), (pointer: coarse) {
     :root { --grid-gap: 3px; }
     button, input, select { min-height: 54px; }
     .drop-btn { min-height: 54px; }
+    .db-edge { min-height: 0; }
   }
   @media (min-width: 720px) {
     body { --page-pad: 24px; }
     .wrap { max-width: 1040px; }
     .card { padding: 22px; }
-    .connect-panel { max-width: 760px; margin-left: auto; margin-right: auto; }
+    .connect-panel, .dots-panel { max-width: 760px; margin-left: auto; margin-right: auto; }
     #placement.card, #home.card, #lobby.card { max-width: 620px; margin-left: auto; margin-right: auto; }
     .uno-opponents { max-width: 620px; width: 100%; margin: 0 auto; }
     #oneCard .battle-dock { max-width: 720px; width: 100%; margin: 0 auto; }
@@ -1059,6 +1205,47 @@
   </section>
 
 
+  <!-- DOTS AND BOXES -->
+  <section id="dotsBoxes" class="card dots-panel hidden">
+    <div id="dotsStatus" class="status">...</div>
+    <div class="dots-scorebar">
+      <div class="dots-player you">
+        <div>
+          <strong id="dotsYouName">You</strong>
+          <span>Your boxes</span>
+        </div>
+        <div class="dots-score" id="dotsYouScore">0</div>
+      </div>
+      <div class="dots-turn">
+        <span>Turn</span>
+        <strong id="dotsTurnText">Your line</strong>
+        <span id="dotsProgress">0/16</span>
+      </div>
+      <div class="dots-player opponent">
+        <div class="dots-score" id="dotsOpponentScore">0</div>
+        <div>
+          <strong id="dotsOpponentName">Opponent</strong>
+          <span>Their boxes</span>
+        </div>
+      </div>
+    </div>
+    <div class="dots-stage">
+      <div class="dots-board" id="dotsBoard"></div>
+      <div class="dots-last" id="dotsLast">Draw a line. Close a box to keep the turn.</div>
+    </div>
+    <div id="dotsEndBanner" class="dots-end hidden">
+      <strong id="dotsEndTitle">Victory</strong>
+      <span id="dotsEndSub">0 to 0</span>
+    </div>
+    <div class="dots-actions">
+      <button class="ghost" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost" onclick="leaveGame()">Leave</button>
+    </div>
+  </section>
+
+
   <!-- UNO -->
   <section id="oneCard" class="uno-screen hidden">
     <div id="oneCardStatus" class="status">...</div>
@@ -1134,6 +1321,7 @@
 <script src="games/registry.js"></script>
 <script src="games/battleship.js"></script>
 <script src="games/connectfour.js"></script>
+<script src="games/dotsboxes.js"></script>
 <script src="games/onecard.js"></script>
 <script src="games/mancala.js"></script>
 <script src="games/ultimatettt.js"></script>
