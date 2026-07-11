@@ -316,6 +316,10 @@
     background: radial-gradient(50% 60% at 50% 100%, rgba(46,230,224,.26), transparent 72%);
   }
   .connect-panel > * { position: relative; z-index: 1; }
+  .connect-panel .status {
+    margin-top: 0; min-height: 50px; display: flex; align-items: center; justify-content: center;
+    padding: 10px 12px; line-height: 1.18; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .connect-rail {
     display: grid; grid-template-columns: 1fr minmax(98px, 130px) 1fr; align-items: stretch;
     gap: 8px; margin-top: 12px; min-height: 74px;
@@ -360,24 +364,35 @@
   .connect-turn.opponent i { color: var(--cf-opp); }
   .connect-stage {
     margin-top: 12px; padding: 12px; border: 1px solid var(--cf-line); border-radius: 16px;
-    background: linear-gradient(180deg, rgba(4,26,43,.88), rgba(1,9,17,.94));
-    box-shadow: inset 0 0 36px rgba(46,230,224,.07), 0 18px 42px rgba(0,0,0,.38);
+    background:
+      linear-gradient(180deg, rgba(19,68,92,.35), transparent 34%),
+      linear-gradient(180deg, rgba(4,26,43,.9), rgba(1,9,17,.96));
+    box-shadow: inset 0 0 36px rgba(46,230,224,.08), 0 18px 42px rgba(0,0,0,.38);
   }
   .connect-columns { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--cf-gap); margin-bottom: 9px; }
   .drop-btn {
-    position: relative; display: flex; align-items: center; justify-content: center;
-    min-width: 0; min-height: 50px; padding: 6px 2px 15px; border-radius: 999px;
-    background: linear-gradient(180deg, rgba(8,60,82,.8), rgba(2,18,31,.94));
-    color: var(--cf-you); border-color: rgba(46,230,224,.26); box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-width: 0; min-height: 56px; padding: 7px 2px 6px; border: 1px solid rgba(46,230,224,.3); border-radius: 999px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.08), transparent 34%),
+      linear-gradient(180deg, rgba(8,60,82,.86), rgba(2,18,31,.96));
+    color: var(--cf-you); box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 9px 18px rgba(0,0,0,.22);
+    cursor: pointer; touch-action: manipulation; user-select: none; overflow: hidden;
   }
   .drop-btn::before {
-    content: ""; width: 13px; height: 13px; border-right: 3px solid currentColor; border-bottom: 3px solid currentColor;
-    transform: rotate(45deg); margin-top: -7px; filter: drop-shadow(0 0 7px currentColor);
+    content: ""; position: absolute; inset: 4px 6px auto; height: 46%; border-radius: 999px; pointer-events: none;
+    background: radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), transparent 62%);
+    opacity: .8;
   }
-  .drop-btn::after {
-    content: attr(data-label); position: absolute; left: 4px; right: 4px; bottom: 5px;
-    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-    color: var(--cf-muted); font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: uppercase;
+  .drop-arrow {
+    position: relative; z-index: 1; width: 14px; height: 14px; flex: 0 0 14px;
+    border-right: 3px solid currentColor; border-bottom: 3px solid currentColor;
+    transform: rotate(45deg); filter: drop-shadow(0 0 7px currentColor); pointer-events: none;
+  }
+  .drop-label {
+    position: relative; z-index: 1; display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    color: var(--cf-muted); font-size: 10px; font-weight: 800; letter-spacing: 0; line-height: 1; text-transform: uppercase;
+    pointer-events: none;
   }
   .drop-btn:hover:not(:disabled), .drop-btn:focus-visible, .drop-btn.selected {
     border-color: var(--cf-line-strong); background: linear-gradient(180deg, rgba(11,95,122,.9), rgba(3,28,46,.96));
@@ -385,7 +400,10 @@
   }
   .drop-btn:focus-visible { outline: 2px solid var(--cf-you); outline-offset: 2px; }
   .drop-btn.win-now { color: #f9fdff; background: linear-gradient(180deg, rgba(24,183,180,.92), rgba(5,71,91,.96)); border-color: var(--cf-you); }
+  .drop-btn.win-now .drop-label { color: #e8ffff; }
   .drop-btn.block-now { color: #fff5d7; border-color: rgba(246,173,45,.72); box-shadow: 0 0 16px var(--cf-opp-soft), inset 0 1px 0 rgba(255,255,255,.1); }
+  .drop-btn.block-now .drop-label { color: #ffe3a6; }
+  .drop-btn:active:not(:disabled) { transform: translateY(1px); }
   .drop-btn:disabled { opacity: .34; cursor: not-allowed; filter: saturate(.6); }
   .connect-board-shell {
     position: relative; padding: 10px; border-radius: 16px; border: 1px solid rgba(46,230,224,.36);
@@ -1006,6 +1024,7 @@
   body.is-phone .cell { border-radius: 3px; }
   body.is-phone .ship-row { min-height: 54px; }
   body.is-phone .connect-panel { --cf-gap: 5px; }
+  body.is-phone .connect-panel .status { position: static; top: auto; z-index: 1; min-height: 50px; }
   body.is-phone .connect-rail { grid-template-columns: 1fr 72px 1fr; gap: 6px; min-height: 84px; }
   body.is-phone .connect-player {
     flex-direction: column; justify-content: center; text-align: center;
@@ -1185,8 +1204,6 @@
 
   <!-- CONNECT FOUR -->
   <section id="connectFour" class="card connect-panel hidden">
-    <div class="orientation-note portrait-recommended">Portrait is recommended for Connect Four with larger column drop buttons.</div>
-    <div class="orientation-note landscape-required">Rotate to landscape for this game mode.</div>
     <div id="connectStatus" class="status">...</div>
     <div class="connect-rail" id="connectRail">
       <div class="connect-player you" id="connectYouPanel">

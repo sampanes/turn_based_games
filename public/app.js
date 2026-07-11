@@ -1201,6 +1201,7 @@ function renderConnectFour(d, v) {
   const opponentSlot = connectOpponentSlot(d);
   const opponentName = d.opponentName || 'Opponent';
   const legal = v.legalMoves || [];
+  const yourTurn = v.phase === 'battle' && v.turn === d.you;
 
   connectLastData = d;
   if (connectUi.focusedCol >= cols) connectUi.focusedCol = Math.floor(cols / 2);
@@ -1209,7 +1210,7 @@ function renderConnectFour(d, v) {
   }
   const focused = connectUi.focusedCol;
   const focusedTone = connectColumnTone(v, focused, d);
-  const previewRow = connectCanMove(v, focused) ? connectDropRow(v, focused) : -1;
+  const previewRow = yourTurn && connectCanMove(v, focused) ? connectDropRow(v, focused) : -1;
 
   const youPanel = $('connectYouPanel');
   const opponentPanel = $('connectOpponentPanel');
@@ -1222,20 +1223,40 @@ function renderConnectFour(d, v) {
   if ($('connectTurnText')) $('connectTurnText').textContent = v.phase === 'over' ? 'Done' : v.turn === d.you ? 'You' : 'Them';
 
   columns.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  columns.onclick = event => {
+    const source = event.target && event.target.closest ? event.target : event.target && event.target.parentElement;
+    const target = source ? source.closest('.drop-btn') : null;
+    if (!target || target.disabled) return;
+    const col = Number(target.dataset.col);
+    if (Number.isInteger(col)) dropConnectDisc(col);
+  };
   columns.innerHTML = '';
   for (let c = 0; c < cols; c++) {
     const tone = connectColumnTone(v, c, d);
+    const canDrop = yourTurn && connectCanMove(v, c);
+    const focusColumn = () => {
+      if (!canDrop) return;
+      connectSetFocus(c, false);
+    };
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.className = 'drop-btn'
       + (c === focused ? ' selected' : '')
       + (tone.kind === 'win' ? ' win-now' : '')
       + (tone.kind === 'block' ? ' block-now' : '');
-    btn.dataset.label = tone.label;
-    btn.disabled = !connectCanMove(v, c);
+    btn.dataset.col = String(c);
+    btn.disabled = !canDrop;
     btn.setAttribute('aria-label', `Drop disc in column ${c + 1}`);
-    btn.onpointerenter = () => connectSetFocus(c);
-    btn.onfocus = () => connectSetFocus(c);
-    btn.onclick = () => dropConnectDisc(c);
+    const arrow = document.createElement('span');
+    arrow.className = 'drop-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    const label = document.createElement('span');
+    label.className = 'drop-label';
+    label.textContent = tone.label;
+    btn.append(arrow, label);
+    btn.onpointerenter = focusColumn;
+    btn.onpointerdown = () => { if (canDrop) connectSetFocus(c, false); };
+    btn.onfocus = () => { if (canDrop) connectSetFocus(c, false); };
     columns.appendChild(btn);
   }
 
@@ -1248,11 +1269,12 @@ function renderConnectFour(d, v) {
     const owner = v.board[r][c];
     const key = `${r},${c}`;
     const isPreview = !owner && r === previewRow && c === focused;
+    const canDrop = yourTurn && connectCanMove(v, c);
     const relation = owner ? owner === d.you ? ' you' : ' opponent' : '';
     const cell = document.createElement('div');
     cell.className = 'connect-cell'
       + relation
-      + (connectCanMove(v, c) ? ' playable' : '')
+      + (canDrop ? ' playable' : '')
       + (isPreview ? ' preview' : '')
       + (isPreview && focusedTone.kind === 'block' ? ' danger-preview' : '')
       + (last === key ? ' last' : '')
@@ -1260,8 +1282,9 @@ function renderConnectFour(d, v) {
       + (winning.has(key) ? ' win' : '');
     cell.setAttribute('role', 'gridcell');
     cell.setAttribute('aria-label', owner ? `${owner === d.you ? 'Your' : opponentName} disc` : `Empty slot, column ${c + 1}`);
-    cell.onpointerenter = () => connectSetFocus(c);
-    cell.onclick = () => dropConnectDisc(c);
+    cell.onpointerenter = () => { if (canDrop) connectSetFocus(c, false); };
+    cell.onpointerdown = () => { if (canDrop) connectSetFocus(c, false); };
+    if (canDrop) cell.onclick = () => dropConnectDisc(c);
     if (owner) {
       const token = document.createElement('span');
       token.className = 'connect-token';
@@ -1298,7 +1321,7 @@ function renderConnectFour(d, v) {
     connectUi.overFxDone = false;
   } else {
     banner.className = 'status them';
-    banner.textContent = `Standing by - ${opponentName} is lining up a drop...`;
+    banner.textContent = `OPPONENT TURN - ${opponentName}`;
     if (end) end.classList.add('hidden');
     connectUi.overFxDone = false;
   }
