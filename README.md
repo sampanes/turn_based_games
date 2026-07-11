@@ -17,12 +17,15 @@ localhost and be shared privately through a network layer such as Tailscale Serv
 - Ultimate Tic-Tac-Toe
 - UNO-style One Card for two to four players
 
+Future game ideas are tracked in [GAME_CANDIDATES.md](GAME_CANDIDATES.md).
+
 ## Static Solo Play
 
-Publish the repository from the default branch root with GitHub Pages. The repository
-root is a landing page and the playable static client lives under `public/`.
+Publish the repository from the default branch root with GitHub Pages. The one and
+only landing page is the client at `public/`; the repository root `index.html` (and
+`404.html`) just forward there so old links keep working.
 
-Example launch paths:
+Example launch paths (a launch link always wins over a leftover saved session):
 
 ```text
 public/?mode=computer&game=battleship
@@ -164,11 +167,11 @@ npm test
 ## Project Layout
 
 ```text
-index.html                       GitHub Pages landing page
-404.html                         GitHub Pages fallback
+index.html                       GitHub Pages forwarder to public/
+404.html                         GitHub Pages fallback forwarder to public/
 server.js                        local HTTP server, rooms, limits, and persistence
 public/
-  index.html                     mobile-first game client
+  index.html                     mobile-first game client (the landing page)
   app.js                         sessions, polling, animation, sound, and UI state
   solo.js                        browser-local computer-play adapter
   games/                         shared browser and server game rules

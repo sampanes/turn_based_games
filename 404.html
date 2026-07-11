@@ -4,85 +4,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#06141b">
-<title>Turn-Based Games - play the computer</title>
+<title>Turn-Based Games - not found</title>
 <style>
-  :root {
-    --abyss: #06141b;
-    --deep: #0a1f2b;
-    --hull: #11313f;
-    --line: #1d4a5e;
-    --sonar: #34e7c4;
-    --sonar-dim: #1f8a78;
-    --amber: #ffb347;
-    --ink: #cfe9ec;
-    --mute: #8db4bd;
-  }
-  * { box-sizing: border-box; }
   body {
-    margin: 0;
-    min-height: 100vh;
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color: var(--ink);
-    background:
-      radial-gradient(90% 60% at 50% 0%, #11313f 0%, rgba(17,49,63,0) 65%),
-      linear-gradient(180deg, var(--deep), var(--abyss));
+    color: #cfe9ec; background: linear-gradient(180deg, #0a1f2b, #06141b);
   }
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    opacity: .18;
-    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
-    background-size: 34px 34px;
-    mask: radial-gradient(80% 70% at 50% 30%, #000 0%, transparent 82%);
-  }
-  main { position: relative; z-index: 1; width: min(1040px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0; }
-  .hero { display: grid; gap: 18px; max-width: 760px; margin-bottom: 28px; }
-  .eyebrow { color: var(--amber); letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
-  h1 { margin: 0; font-size: clamp(36px, 8vw, 76px); line-height: .95; color: var(--sonar); text-shadow: 0 0 22px rgba(52,231,196,.3); }
-  .lede { margin: 0; color: var(--mute); line-height: 1.7; font-size: 16px; max-width: 68ch; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; margin-top: 26px; }
-  .card { background: linear-gradient(180deg, rgba(17,49,63,.78), rgba(10,31,43,.84)); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 18px 45px rgba(0,0,0,.32), inset 0 1px 0 rgba(52,231,196,.06); }
-  .card h2 { margin: 0 0 10px; color: var(--ink); font-size: 20px; }
-  .card p { margin: 0 0 18px; color: var(--mute); line-height: 1.55; font-size: 14px; }
-  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
-  a.button { display: inline-flex; justify-content: center; align-items: center; min-height: 44px; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--line); color: var(--ink); text-decoration: none; background: var(--hull); font-weight: 700; }
-  a.primary { color: #04231d; border: none; background: linear-gradient(180deg, var(--sonar), var(--sonar-dim)); }
-  .note { border-left: 3px solid var(--amber); padding-left: 14px; color: var(--mute); font-size: 13px; line-height: 1.6; margin-top: 24px; }
+  a { color: #34e7c4; }
 </style>
 </head>
 <body>
-<main>
-  <section class="hero">
-    <div class="eyebrow">Static GitHub Pages mode</div>
-    <h1>Turn-Based Games</h1>
-    <p class="lede">Pick a player-vs-computer game and play immediately in your browser. Solo games are static-file friendly and use the same shared rules modules that the live-server multiplayer mode will use.</p>
-    <div class="actions">
-      <a class="button primary" href="public/?mode=computer&game=battleship">Play Battleship vs computer</a>
-      <a class="button" href="public/">Open game client</a>
-    </div>
-  </section>
-
-  <section class="grid" aria-label="Solo games">
-    <article class="card">
-      <h2>Battleship</h2>
-      <p>Deploy your fleet, fire one shot per turn, and hunt the computer fleet before yours sinks.</p>
-      <a class="button primary" href="public/?mode=computer&game=battleship">Play vs computer</a>
-    </article>
-    <article class="card">
-      <h2>Connect Four</h2>
-      <p>Drop command discs into a seven-column board and connect four before the bot does.</p>
-      <a class="button primary" href="public/?mode=computer&game=connectfour">Play vs computer</a>
-    </article>
-    <article class="card">
-      <h2>UNO</h2>
-      <p>Race three simple bots in a color-and-number shedding game inspired by UNO.</p>
-      <a class="button primary" href="public/?mode=computer&game=onecard">Play vs computer</a>
-    </article>
-  </section>
-
-  <p class="note">Live room-code multiplayer is still available when you run the Node server locally; GitHub Pages only hosts the static solo client.</p>
-</main>
+<p>Page not found - heading back to the game client... <a id="fallback" href="/turn_based_games/public/">tap here if nothing happens</a>.</p>
+<script>
+  // GitHub Pages serves this for any unknown path on the project site.
+  // The first path segment is the repo name; forward to its public/ client.
+  var parts = window.location.pathname.split('/').filter(Boolean);
+  var base = parts.length ? '/' + parts[0] + '/' : '/';
+  var target = base + 'public/';
+  document.getElementById('fallback').href = target;
+  window.location.replace(target);
+</script>
 </body>
 </html>

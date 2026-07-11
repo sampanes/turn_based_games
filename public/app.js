@@ -2358,7 +2358,13 @@ populateGameSelect();
 const params = launchParams();
 applyLaunchGame(params.game);
 session = loadSession();
-if (session) { show('battle'); enterRoom(); }
+// A deliberate launch link outranks a leftover session for another game;
+// without this, one stale saved room swallows every landing-page button.
+if (session && params.mode === 'computer' && params.game && gameMeta(params.game)
+    && !(session.mode === 'computer' && session.game === params.game)) {
+  clearSession();
+}
+if (session) { show('battle'); enterRoom(); clearLaunchParams(); }
 else if (params.mode === 'computer') {
   show('home');
   createComputerGame().finally(clearLaunchParams);
