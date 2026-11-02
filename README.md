@@ -80,12 +80,15 @@ player browser -> private tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:8080
 One-time preparation:
 
 1. Install Tailscale and sign in on the game host.
-2. Give the host a generic, non-personal machine name before enabling HTTPS.
+2. Give the host a generic, non-personal machine name before enabling HTTPS. Tailscale
+   HTTPS certificates are recorded in public Certificate Transparency logs, so the machine
+   name and tailnet name become publicly visible.
 3. Start the local game server.
 4. Run `enable-private-share.bat`, using an Administrator console if requested.
 5. Inspect the private URL with `status-turn-based-games.bat`.
 6. Share only the game-host machine with each intended player.
-7. Restrict shared users to the HTTPS game service in the tailnet access policy.
+7. Restrict shared users to the HTTPS game service in the tailnet access policy (see
+   [Limit shared players to the game](#limit-shared-players-to-the-game)).
 
 Each person should use a separate Tailscale account. Sharing a single host is narrower
 than inviting someone into the entire tailnet. Keep recipient identities and access
@@ -96,6 +99,48 @@ Funnel, forward port 8080 on a router, or add a public firewall rule for this se
 
 Tailscale Serve configuration can remain in place while the Node backend is stopped.
 The private URL will become usable again the next time the named server is started.
+
+### Limit shared players to the game
+
+The game host is usually a home PC that also offers other things over the same tailnet:
+remote desktop or game streaming, file shares, personal tools. Sharing the machine keeps
+players out of your other machines, but **not** out of that machine's other services.
+A share reaches every port on the shared machine that the tailnet policy allows, and a
+rule with `"src": ["*"]`, like the default allow-all policy, matches shared users too.
+
+Two rules in the tailnet policy file (admin console -> Access controls) separate the game
+from everything else on the host:
+
+```jsonc
+{
+  "hosts": {
+    "game-host": "100.x.y.z"   // the host's Tailscale IP: tailscale ip -4
+  },
+  "acls": [
+    // People who accepted a share of the game host: the HTTPS game service only.
+    { "action": "accept", "src": ["autogroup:shared"], "dst": ["game-host:443"] },
+
+    // Your own users and devices. autogroup:member does NOT include shared users,
+    // so this keeps your access as it is today. Narrow it as you see fit; it is
+    // independent of the game rule above.
+    { "action": "accept", "src": ["autogroup:member"], "dst": ["*:*"] }
+  ]
+}
+```
+
+- Remove or rewrite every other rule whose `src` is `"*"`. Any one of them gives shared
+  players access to the rest of the host again, whatever the game rule says.
+- Port 443 is the only port needed. Tailscale Serve terminates HTTPS on 443 and forwards
+  to the server, which listens on `127.0.0.1:8080` and is not reachable from the tailnet
+  directly.
+- This only governs people you **share** the machine with. Anyone you invite as a full
+  member of your tailnet falls under the `autogroup:member` rule instead, so share the
+  machine with players rather than inviting them.
+- To check: a player's browser should open the game URL, and nothing else on the host
+  (for example a streaming or file-sharing port) should answer them.
+
+Tailscale's references: device sharing (https://tailscale.com/kb/1084/sharing) and policy
+syntax, including `autogroup:shared` (https://tailscale.com/kb/1337/policy-syntax).
 
 ## Multiplayer Behavior
 
