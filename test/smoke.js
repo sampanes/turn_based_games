@@ -137,6 +137,19 @@ function testDotsBoxesScoring() {
   assert.strictEqual(dots.viewFor(state, 'B').legalMoves.length, 36);
 }
 
+function testBattleshipCanonicalCells() {
+  const bs = require('../public/games/battleship');
+  const state = bs.init();
+  // Zero-padded cells must be stored canonically so shots can still hit them.
+  const padded = fleet().map(s => ({ name: s.name, cells: s.cells.map(x => x.split(',').map(n => n.padStart(2, '0')).join(',')) }));
+  assert.strictEqual(bs.validateSetup(state, 'A', padded), null);
+  assert.deepStrictEqual(state.A.ships[0].cells, ['0,0', '0,1', '0,2', '0,3', '0,4']);
+  const alias = fleet();
+  alias[4] = { name: 'Destroyer', cells: ['00,0', '0,1'] };
+  assert.strictEqual(bs.validateSetup(bs.init(), 'A', alias), 'Ships overlap.');
+  assert.strictEqual(bs.validateSetup(bs.init(), 'A', [null, null, null, null, null]), 'Bad ship.');
+}
+
 function fleet() {
   return [
     { name: 'Carrier', cells: ['0,0', '0,1', '0,2', '0,3', '0,4'] },
@@ -151,6 +164,7 @@ async function main() {
   testUnoTurnSyncAndSorting();
   testMancalaMoveIdentity();
   testDotsBoxesScoring();
+  testBattleshipCanonicalCells();
   try { fs.unlinkSync(dataFile); } catch {}
   fs.writeFileSync(dataFile, JSON.stringify({
     rooms: {
@@ -317,6 +331,12 @@ async function main() {
       name: 'Unexpected',
     });
     assert.strictEqual(botJoinDeny.status, 409);
+
+    // Botty has no token; a request with none must not be treated as Botty.
+    const tokenless = await request(port, 'GET', `/api/state?room=${botCreated.data.room}`, null, {});
+    assert.strictEqual(tokenless.status, 403);
+    const tokenlessMove = await request(port, 'POST', '/api/move', { room: botCreated.data.room, move: { c: 0 } }, {});
+    assert.notStrictEqual(tokenlessMove.status, 200);
 
     const humanBotMove = await request(port, 'POST', '/api/move', {
       room: botCreated.data.room,

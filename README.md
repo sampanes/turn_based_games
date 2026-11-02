@@ -13,6 +13,7 @@ localhost and be shared privately through a network layer such as Tailscale Serv
 
 - Battleship
 - Connect Four
+- Dots and Boxes
 - Mancala
 - Ultimate Tic-Tac-Toe
 - UNO-style One Card for two to four players
@@ -31,6 +32,9 @@ Example launch paths (a launch link always wins over a leftover saved session):
 public/?mode=computer&game=battleship
 public/?mode=computer&game=connectfour
 public/?mode=computer&game=mancala
+public/?mode=computer&game=dotsboxes
+public/?mode=computer&game=ultimatettt
+public/?mode=computer&game=onecard
 ```
 
 Solo rooms live only in browser `localStorage`; no server or shared database is used.
@@ -131,6 +135,9 @@ path outside the checkout if runtime state should live elsewhere.
 - Authenticated requests use a bearer token instead of putting tokens in URLs.
 - Static responses include browser security headers.
 - Browser assets are local; the client does not fetch third-party fonts or analytics.
+  One exception: offline Ultimate Tic-Tac-Toe on GitHub Pages loads onnxruntime-web from a
+  CDN and its neural-net opponent (~26 MB) from the companion model site. The local server's
+  Content-Security-Policy blocks both, so there the simpler built-in bot plays instead.
 - Request bodies are limited to 64 KiB.
 - API traffic is limited to 900 requests per identity per minute.
 - At most 200 rooms are retained by default.

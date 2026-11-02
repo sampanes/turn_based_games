@@ -2,7 +2,9 @@
   function soloKey(room) { return `turn-based-games-solo-${room}`; }
   function soloToken() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
   function soloRoomCode() { return 'CPU' + Math.random().toString(36).slice(2, 6).toUpperCase(); }
-  function loadRoom(session) { return JSON.parse(root.localStorage.getItem(soloKey(session.room))); }
+  function loadRoom(session) {
+    try { return JSON.parse(root.localStorage.getItem(soloKey(session.room))); } catch { return null; }
+  }
   function storeRoom(room) { root.localStorage.setItem(soloKey(room.code), JSON.stringify({ ...room, game: undefined })); }
   function clearRoom(session) {
     if (session && session.mode === 'computer') root.localStorage.removeItem(soloKey(session.room));
@@ -39,7 +41,7 @@
       if (!Number.isFinite(room.botReadyAt)) { room.botReadyAt = now + botThinkDelay(); return; }
       if (room.botReadyAt > now) return;
       const move = computerMove(room, room.state.turn);
-      if (!move) break;
+      if (!move) return; // still thinking (async brain): retry next poll, no new delay
       room.game.applyMove(room.state, room.state.turn, move, publicPlayers(room));
       room.botReadyAt = null;
     }

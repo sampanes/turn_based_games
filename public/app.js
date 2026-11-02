@@ -24,7 +24,8 @@ let oneCardHandUi = { selectedIndex: 0, selectedCardId: null, raised: false, ges
 let connectGeneration = 0;
 let connectUi = freshConnectUi();
 let connectLastData = null;
-let dotsUi = { lastMoveNumber: 0, boardSig: '', overFxDone: false };
+let dotsUi = { lastMoveNumber: 0, boardSig: '', domSig: '', overFxDone: false };
+let moveInFlight = false;       // one move POST at a time (double taps)
 
 // ---- mobile / orientation ergonomics
 function isLikelyPhone() {
@@ -146,6 +147,7 @@ async function api(path, method, body) {
 
 async function createGame() {
   try {
+    pruneSoloRooms(null);
     const name = $('name1').value.trim() || 'Player 1';
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online' });
@@ -154,6 +156,7 @@ async function createGame() {
 }
 async function createBottyGame() {
   try {
+    pruneSoloRooms(null);
     const meta = currentGameMeta();
     if (meta && meta.supportsComputer === false) return toast('Botty does not support that game yet.');
     const name = $('name1').value.trim() || 'Player 1';
@@ -165,6 +168,7 @@ async function createBottyGame() {
 async function createComputerGame() {
   try {
     const name = $('name1').value.trim() || 'Player 1';
+    pruneSoloRooms(null);
     session = { mode: 'computer' };
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer' });
@@ -173,6 +177,7 @@ async function createComputerGame() {
 }
 async function joinGame() {
   try {
+    pruneSoloRooms(null);
     const room = $('joinCode').value.trim().toUpperCase();
     if (room.length !== 4) return toast('Codes are 4 letters/numbers.');
     const name = $('name2').value.trim() || 'Player 2';
@@ -238,8 +243,35 @@ async function copyRoomCode() {
 
 function enterRoom() { startPoll(); poll(); }
 
+// Sends one move, then waits for the fresh view before accepting another tap,
+// so a double tap cannot post twice off a stale view.
+async function postMove(move) {
+  if (moveInFlight) return false;
+  moveInFlight = true;
+  try {
+    await api('/api/move', 'POST', { room: session.room, move });
+    await poll();
+    return true;
+  } catch (e) { toast(e.message); return false; }
+  finally { moveInFlight = false; }
+}
+
+// Solo rooms live in localStorage under their own key; drop any that do not
+// belong to the current session so abandoned offline games do not pile up.
+function pruneSoloRooms(keepRoom) {
+  try {
+    const prefix = 'turn-based-games-solo-';
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(prefix) && k !== prefix + keepRoom)
+      .forEach(k => localStorage.removeItem(k));
+  } catch {}
+}
+
 async function restartComputerGame() {
   if (!session || session.mode !== 'computer') return;
+  // Battleship and UTTT report no moveNumber; treat any battle there as in progress.
+  const midGame = lastView && lastView.phase === 'battle' && (lastView.moveNumber == null || lastView.moveNumber > 0);
+  if (midGame && !confirm('Start a new game? This one will be lost.')) return;
   const game = session.game || selectedGameId();
   const name = ($('name1') && $('name1').value.trim()) || 'Player 1';
   try {
@@ -258,6 +290,9 @@ function updateSoloRestartButtons() {
   document.querySelectorAll('.solo-restart').forEach(btn => {
     btn.classList.toggle('hidden', !(session && session.mode === 'computer'));
   });
+  // Offline and Botty rooms have nobody to invite.
+  const private_ = !!(session && (session.mode === 'computer' || session.bot));
+  document.querySelectorAll('.room-share').forEach(el => el.classList.toggle('hidden', private_));
 }
 
 
@@ -270,7 +305,12 @@ async function poll() {
     const d = await api(`/api/state?room=${encodeURIComponent(session.room)}`, 'GET');
     render(d);
   } catch (e) {
-    if (/No such game|Not in this game/.test(e.message)) { clearSession(); stopPoll(); show('home'); }
+    if (/No such game|Not in this game/.test(e.message)) {
+      clearSession(); stopPoll(); show('home'); updateResumeCard();
+      toast('That game has ended.');
+    } else {
+      console.error(e);
+    }
   }
 }
 
@@ -341,7 +381,7 @@ function resetGameUi() {
   connectLastData = null;
   if ($('connectEndBanner')) $('connectEndBanner').classList.add('hidden');
   if ($('dotsBoard')) $('dotsBoard').innerHTML = '';
-  dotsUi = { lastMoveNumber: 0, boardSig: '', overFxDone: false };
+  dotsUi = { lastMoveNumber: 0, boardSig: '', domSig: '', overFxDone: false };
   if ($('dotsEndBanner')) $('dotsEndBanner').classList.add('hidden');
   if ($('mncBoard')) {
     $('mncBoard').innerHTML = '';
@@ -349,7 +389,7 @@ function resetGameUi() {
     mncLastPits = null; mncLastMoveNumber = 0; mncBoardSig = ''; mncAnimating = false; mncOverFxDone = false;
   }
   if ($('utttBoard')) $('utttBoard').innerHTML = '';
-  utttUi = { lastMove: null, seen: false };
+  utttUi = { lastMove: null, seen: false, domSig: '' };
   $('oneCardOpponents').innerHTML = '';
   resetOneCardHandUi();
   $('oneCardHand').innerHTML = '';
@@ -590,6 +630,11 @@ function previewPlacement(r, c) {
   renderPlaceGrid(preview);
 }
 
+function nextUnplacedShip(fallback) {
+  const i = fleetDef.findIndex(s => !placedShips.find(p => p.name === s.name));
+  return i >= 0 ? i : fallback;
+}
+
 function startPlacementDrag(event, r, c) {
   const key = `${r},${c}`;
   const ship = placedShipAt(key);
@@ -606,6 +651,7 @@ function startPlacementDrag(event, r, c) {
   } else {
     if (selectedShip == null || !fleetDef[selectedShip]) return;
     const def = fleetDef[selectedShip];
+    if (placedShips.find(p => p.name === def.name)) return; // open water never moves a placed ship
     placementDrag = { active: true, moved: false, name: def.name, size: def.size, orient, offsetR: 0, offsetC: 0 };
   }
   const pos = placementCellFromPointer(event);
@@ -637,7 +683,7 @@ function finishPlacementDrag(event) {
   if (!final) { toast('No clear water nearby.'); renderFleetList(); renderPlaceGrid(); event.preventDefault(); return; }
   placedShips = placedShips.filter(p => p.name !== drag.name);
   placedShips.push({ name: drag.name, size: drag.size, cells: final.cells, orient: drag.orient });
-  selectedShip = fleetDef.findIndex(s => s.name === drag.name);
+  selectedShip = nextUnplacedShip(fleetDef.findIndex(s => s.name === drag.name));
   orient = drag.orient;
   $('orientBtn').textContent = orient === 'H' ? 'Heading: East' : 'Heading: South';
   renderFleetList(); renderPlaceGrid();
@@ -1670,9 +1716,12 @@ function renderDotsBoxes(d, v) {
 
   board.style.gridTemplateColumns = Array.from({ length: cols * 2 + 1 }, (_, i) => i % 2 ? 'minmax(38px, 1fr)' : 'var(--dots-dot)').join(' ');
   board.style.gridTemplateRows = Array.from({ length: rows * 2 + 1 }, (_, i) => i % 2 ? 'minmax(38px, 1fr)' : 'var(--dots-dot)').join(' ');
-  board.innerHTML = '';
+  // Rebuilding every poll destroyed the edge button under a finger mid-tap.
+  const domSig = JSON.stringify([rows, cols, d.you, v.edges, v.boxes, v.lastMove, [...legal]]);
+  const rebuild = domSig !== dotsUi.domSig;
+  if (rebuild) board.innerHTML = '';
 
-  for (let gr = 0; gr < rows * 2 + 1; gr++) {
+  for (let gr = 0; rebuild && gr < rows * 2 + 1; gr++) {
     for (let gc = 0; gc < cols * 2 + 1; gc++) {
       if (gr % 2 === 0 && gc % 2 === 0) {
         const dot = document.createElement('div');
@@ -1764,6 +1813,7 @@ function renderDotsBoxes(d, v) {
   }
   dotsUi.lastMoveNumber = v.moveNumber || 0;
   dotsUi.boardSig = boardSig;
+  dotsUi.domSig = domSig;
 }
 
 async function claimDotsEdge(type, r, c) {
@@ -1776,12 +1826,9 @@ async function claimDotsEdge(type, r, c) {
     toast('That line is already claimed.');
     return;
   }
-  try {
-    dotsSfx('line');
-    battleVibrate(8);
-    await api('/api/move', 'POST', { room: session.room, move: { type, r, c } });
-    poll();
-  } catch (e) { toast(e.message); }
+  mncEnsureAudio();
+  battleVibrate(8);
+  await postMove({ type, r, c });
 }
 
 // ---------------- UNO ----------------
@@ -2088,7 +2135,9 @@ function unoBanner(d, v) {
   const players = v.players || [];
   if (v.phase === 'lobby') {
     banner.className = 'status them';
-    banner.textContent = v.canStart ? 'READY -- start now or wait for more players' : `Share the code -- UNO starts with ${v.minPlayers}+ players`;
+    const solo = session && (session.mode === 'computer' || session.bot);
+    banner.textContent = solo ? 'READY -- deal the cards when you are'
+      : v.canStart ? 'READY -- start now or wait for more players' : `Share the code -- UNO starts with ${v.minPlayers}+ players`;
   } else if (v.phase === 'over') {
     const won = v.winner === session.you;
     const winner = players.find(p => p.slot === v.winner);
@@ -2308,7 +2357,7 @@ async function startOneCard() {
   } catch (e) { toast(e.message); }
 }
 function playOneCard(card) {
-  if (unoAnimating) return;
+  if (unoAnimating) { toast('Hold on, the table is still playing.'); return; }
   if (!oneCardCanPlay(lastView, card)) { toast('That card is not legal right now.'); return; }
   mncEnsureAudio();
   if (card.color === 'wild') {
@@ -2331,21 +2380,15 @@ function cancelWildColor() {
   $('unoColorPick').classList.add('hidden');
 }
 async function sendOneCardPlay(move) {
-  try {
-    battleVibrate(10);
-    await api('/api/move', 'POST', { room: session.room, move });
-    poll();
-  } catch (e) { toast(e.message); }
+  battleVibrate(10);
+  await postMove(move);
 }
 async function drawOneCard() {
-  if (unoAnimating) return;
+  if (unoAnimating) { toast('Hold on, the table is still playing.'); return; }
   if (!lastView || lastView.ui !== 'onecard' || lastView.phase !== 'battle' || lastView.turn !== session.you) { toast('Not your turn.'); return; }
-  try {
-    mncEnsureAudio();
-    battleVibrate(10);
-    await api('/api/move', 'POST', { room: session.room, move: { action: 'draw' } });
-    poll();
-  } catch (e) { toast(e.message); }
+  mncEnsureAudio();
+  battleVibrate(10);
+  await postMove({ action: 'draw' });
 }
 
 // ---------------- Mancala ----------------
@@ -2363,7 +2406,7 @@ function mncEnsureAudio() {
     if (!AudioContext) return null;
     mncAudioContext = new AudioContext();
   }
-  if (mncAudioContext.state === 'suspended') mncAudioContext.resume().catch(() => {});
+  if (mncAudioContext.state !== 'running') mncAudioContext.resume().catch(() => {}); // suspended, or iOS 'interrupted'
   return mncAudioContext;
 }
 
@@ -2743,16 +2786,13 @@ async function moveMancala(pitIdx) {
   if (!lastView || lastView.phase !== 'battle' || !lastView.isMyTurn) { toast('Not your turn.'); return; }
   if (!lastView.validMoves.includes(pitIdx)) { toast('That pit is empty.'); return; }
 
-  try {
-    mncEnsureAudio();
-    battleVibrate(10);
-    await api('/api/move', 'POST', { room: session.room, move: { pit: pitIdx } });
-    poll();
-  } catch (e) { toast(e.message); }
+  mncEnsureAudio();
+  battleVibrate(10);
+  await postMove({ pit: pitIdx });
 }
 
 // ---------------- Ultimate TTT ----------------
-let utttUi = { lastMove: null, seen: false };
+let utttUi = { lastMove: null, seen: false, domSig: '' };
 
 function utttSfx(mine) {
   if (!battleFxOn) return;
@@ -2769,8 +2809,10 @@ function renderUltimateTTT(d, v) {
   const validSet = new Set(v.validMoves || []);
   const newMove = utttUi.seen && v.lastMove !== null && v.lastMove !== utttUi.lastMove;
 
-  board.innerHTML = '';
-  for (let mini = 0; mini < 9; mini++) {
+  const domSig = JSON.stringify([v.board, v.miniWinners, v.validMoves, v.lastMove, v.activeMini, v.isMyTurn]);
+  const rebuild = domSig !== utttUi.domSig;
+  if (rebuild) board.innerHTML = '';
+  for (let mini = 0; rebuild && mini < 9; mini++) {
     const miniWinner = v.miniWinners[mini];
     const baseRow = Math.floor(mini / 3) * 3;
     const baseCol = (mini % 3) * 3;
@@ -2819,7 +2861,7 @@ function renderUltimateTTT(d, v) {
     utttSfx(mineJustPlayed);
     battleVibrate(mineJustPlayed ? 8 : 14);
   }
-  utttUi = { lastMove: v.lastMove, seen: true };
+  utttUi = { lastMove: v.lastMove, seen: true, domSig };
 
   const banner = $('utttStatus');
   if (v.phase === 'over') {
@@ -2847,15 +2889,13 @@ function renderUltimateTTT(d, v) {
 
 async function moveUltimateTTT(idx) {
   if (!lastView || lastView.phase !== 'battle' || !lastView.isMyTurn) { toast('Not your turn.'); return; }
-  try {
-    await api('/api/move', 'POST', { room: session.room, move: { idx } });
-    poll();
-  } catch (e) { toast(e.message); }
+  mncEnsureAudio();
+  await postMove({ idx });
 }
 
 // ---------------- boot ----------------
-document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-document.addEventListener('pointerdown', mncEnsureAudio, { once: true });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && pollTimer) poll(); });
+['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(type => document.addEventListener(type, mncEnsureAudio, { passive: true }));
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
 $('gameSelect').addEventListener('change', () => applyDeviceClasses('home'));
 window.addEventListener('resize', () => {
@@ -2874,7 +2914,7 @@ document.addEventListener('keydown', e => {
   if (lastView && lastView.ui === 'connectfour') {
     if (e.key === 'ArrowLeft') { e.preventDefault(); connectStepFocus(-1); return; }
     if (e.key === 'ArrowRight') { e.preventDefault(); connectStepFocus(1); return; }
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dropConnectDisc(connectUi.focusedCol); return; }
+    if ((e.key === 'Enter' || e.key === ' ') && !(e.target && e.target.tagName === 'BUTTON' && !e.target.classList.contains('cf-zone'))) { e.preventDefault(); dropConnectDisc(connectUi.focusedCol); return; }
   }
   const n = Number(e.key);
   if (n >= 1 && n <= 7 && lastView && lastView.ui === 'connectfour') { e.preventDefault(); dropConnectDisc(n - 1); }
@@ -2885,6 +2925,7 @@ populateGameSelect();
 const params = launchParams();
 applyLaunchGame(params.game);
 session = loadSession();
+pruneSoloRooms(session && session.mode === 'computer' ? session.room : null);
 // The home screen is always the landing page. A saved session becomes a
 // Resume card there instead of auto-teleporting into the old game; only an
 // explicit ?mode=computer&game=x launch link jumps straight into play.

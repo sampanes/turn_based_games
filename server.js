@@ -83,6 +83,8 @@ function roomCode() {
 
 // ----------------------------------------------------------------- room helpers
 function playerOf(room, tok) {
+  // Botty has no token: a missing token must never match it.
+  if (!tok) return null;
   for (const [slot, player] of Object.entries(room.players || {})) {
     if (player && player.token === tok) return slot;
   }

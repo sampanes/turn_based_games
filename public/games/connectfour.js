@@ -136,6 +136,7 @@ const connectfour = {
     if (state.phase !== 'battle') return 'Game is already over.';
     if (state.turn !== who) return 'Not your turn.';
     const col = move && Number.isInteger(move.c) ? move.c : move && Number.isInteger(move.col) ? move.col : null;
+    if (col === null || col < 0 || col >= COLS) return 'Pick a column.';
     const dropped = dropDisc(state.board, col, who);
     if (!dropped) return 'That column is full.';
 

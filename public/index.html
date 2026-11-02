@@ -1098,8 +1098,11 @@
   body.is-phone .dots-actions { grid-template-columns: 1fr 1fr; }
   body.is-phone .dots-actions .solo-restart { grid-column: span 1; }
   body.is-phone .toast { width: min(92vw, 420px); text-align: center; bottom: calc(env(safe-area-inset-bottom) + 18px); }
-  body.is-phone.needs-landscape .orientation-note.landscape-required,
-  body.is-phone.needs-portrait .orientation-note.portrait-recommended { display: block; }
+  /* solo and Botty rooms hide Copy code: lay the remaining dock buttons out in one row */
+  .connect-actions:has(> .room-share.hidden), .dots-actions:has(> .room-share.hidden) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
+  .connect-actions:has(> .room-share.hidden) > *, .dots-actions:has(> .room-share.hidden) > * { grid-column: auto !important; }
+  /* only nag when the phone is held the wrong way */
+  body.is-phone.needs-portrait.is-landscape .orientation-note.portrait-recommended { display: block; }
   body.is-phone.needs-landscape:not(.is-landscape) .orientation-note.landscape-required { display: block; border-color: var(--fire); color: #ffd6d2; background: rgba(255,91,81,.12); }
 
   @media (max-width: 520px) {
@@ -1295,7 +1298,7 @@
       <span id="connectEndSub">Four in a row</span>
     </div>
     <div class="connect-actions">
-      <button class="ghost" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
       <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
       <button class="ghost" onclick="leaveGame()">Leave</button>
@@ -1336,7 +1339,7 @@
       <span id="dotsEndSub">0 to 0</span>
     </div>
     <div class="dots-actions">
-      <button class="ghost" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
       <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
       <button class="ghost" onclick="leaveGame()">Leave</button>
@@ -1350,9 +1353,9 @@
     <div class="uno-opponents" id="oneCardOpponents"></div>
     <div class="uno-table" id="unoTable">
       <div id="oneCardCodeWrap" class="uno-lobby hidden">
-        <span class="uno-lobby-label">Invite code</span>
-        <strong id="oneCardCode">....</strong>
-        <button class="ghost" onclick="copyRoomCode()">Copy code</button>
+        <span class="uno-lobby-label room-share">Invite code</span>
+        <strong id="oneCardCode" class="room-share">....</strong>
+        <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
         <button id="oneCardStart" class="primary hidden" onclick="startOneCard()">Start UNO</button>
       </div>
       <div class="uno-center" id="unoCenter">

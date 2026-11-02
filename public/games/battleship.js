@@ -84,20 +84,27 @@ const battleship = {
     if (!Array.isArray(ships) || ships.length !== FLEET.length) return 'Wrong number of ships.';
 
     const wantSizes = FLEET.map(s => s.size).sort().join(',');
-    const gotSizes = ships.map(s => (s.cells || []).length).sort().join(',');
+    if (!ships.every(s => s && typeof s === 'object' && Array.isArray(s.cells))) return 'Bad ship.';
+    const gotSizes = ships.map(s => s.cells.length).sort().join(',');
     if (wantSizes !== gotSizes) return 'Fleet sizes are wrong.';
 
+    // Shots look cells up by their canonical "r,c" text, so store only that form
+    // ("01,02" would pass the bounds check yet never be hit).
+    const canonical = [];
     const occupied = new Set();
     for (const ship of ships) {
-      const cells = ship.cells || [];
-      for (const cell of cells) {
+      const cells = [];
+      for (const cell of ship.cells) {
         const parsed = parseCell(cell);
         if (!parsed) return 'Bad ship cell.';
         const { r, c } = parsed;
         if (!(r >= 0 && r < SIZE && c >= 0 && c < SIZE)) return 'Ship off the board.';
-        if (occupied.has(cell)) return 'Ships overlap.';
-        occupied.add(cell);
+        const key = `${r},${c}`;
+        if (occupied.has(key)) return 'Ships overlap.';
+        occupied.add(key);
+        cells.push(key);
       }
+      canonical.push({ name: ship.name, cells });
 
       const rs = cells.map(x => Number(x.split(',')[0]));
       const cs = cells.map(x => Number(x.split(',')[1]));
@@ -111,7 +118,7 @@ const battleship = {
       }
     }
 
-    state[who].ships = ships.map(s => ({ name: s.name, size: s.cells.length, cells: s.cells, hits: 0 }));
+    state[who].ships = canonical.map(s => ({ name: s.name, size: s.cells.length, cells: s.cells, hits: 0 }));
 
     if (state.A.ships && state.B.ships) {
       state.phase = 'battle';
