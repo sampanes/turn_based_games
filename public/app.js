@@ -52,10 +52,49 @@ function applyDeviceClasses(activeSection) {
 }
 
 // ---- browser session persistence
+// `turnBasedGames` is the game on screen. `turnBasedGamesSaved` remembers every
+// game this browser holds a seat in (newest first) for the home screen list, so
+// starting another game never strands an unfinished one.
+const SAVED_KEY = 'turnBasedGamesSaved';
+const SAVED_MAX = 12;
 function loadSession() { try { return JSON.parse(localStorage.getItem('turnBasedGames')); } catch { return null; } }
-function setSession(s) { session = s; localStorage.setItem('turnBasedGames', JSON.stringify(s)); }
+function loadSavedGames() {
+  try {
+    const list = JSON.parse(localStorage.getItem(SAVED_KEY));
+    return Array.isArray(list) ? list.filter(s => s && s.room && s.token) : [];
+  } catch { return []; }
+}
+function storeSavedGames(list) {
+  const sorted = list.slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  sorted.slice(SAVED_MAX).forEach(s => window.TurnBasedGamesSolo && window.TurnBasedGamesSolo.clearRoom(s));
+  try { localStorage.setItem(SAVED_KEY, JSON.stringify(sorted.slice(0, SAVED_MAX))); } catch {}
+}
+function sameSavedGame(a, b) { return !!(a && b && a.room === b.room && a.mode === b.mode); }
+function rememberGame(s, touch = true) {
+  if (!s || !s.room || !s.token) return;
+  const list = loadSavedGames();
+  const prev = list.find(x => sameSavedGame(x, s));
+  const entry = { ...(prev || {}), ...s, savedAt: touch || !prev ? Date.now() : prev.savedAt };
+  storeSavedGames([entry, ...list.filter(x => !sameSavedGame(x, s))]);
+}
+function forgetGame(s) {
+  if (!s) return;
+  if (window.TurnBasedGamesSolo) window.TurnBasedGamesSolo.clearRoom(s);
+  storeSavedGames(loadSavedGames().filter(x => !sameSavedGame(x, s)));
+}
+function setSession(s) {
+  session = s;
+  localStorage.setItem('turnBasedGames', JSON.stringify(s));
+  rememberGame(s);
+}
+// Discard the current game on this device: its seat, saved entry and solo room.
 function clearSession() {
-  if (session && window.TurnBasedGamesSolo) window.TurnBasedGamesSolo.clearRoom(session);
+  forgetGame(session);
+  session = null;
+  localStorage.removeItem('turnBasedGames');
+}
+// Step away from the current game but keep it in the saved list.
+function detachSession() {
   session = null;
   localStorage.removeItem('turnBasedGames');
 }
@@ -147,7 +186,6 @@ async function api(path, method, body) {
 
 async function createGame() {
   try {
-    pruneSoloRooms(null);
     const name = $('name1').value.trim() || 'Player 1';
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online' });
@@ -156,7 +194,6 @@ async function createGame() {
 }
 async function createBottyGame() {
   try {
-    pruneSoloRooms(null);
     const meta = currentGameMeta();
     if (meta && meta.supportsComputer === false) return toast('Botty does not support that game yet.');
     const name = $('name1').value.trim() || 'Player 1';
@@ -168,7 +205,6 @@ async function createBottyGame() {
 async function createComputerGame() {
   try {
     const name = $('name1').value.trim() || 'Player 1';
-    pruneSoloRooms(null);
     session = { mode: 'computer' };
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer' });
@@ -177,7 +213,6 @@ async function createComputerGame() {
 }
 async function joinGame() {
   try {
-    pruneSoloRooms(null);
     const room = $('joinCode').value.trim().toUpperCase();
     if (room.length !== 4) return toast('Codes are 4 letters/numbers.');
     const name = $('name2').value.trim() || 'Player 2';
@@ -197,32 +232,97 @@ function sectionForGame(gameId) {
     : 'battle';
 }
 
-function updateResumeCard() {
-  const card = $('resumeCard');
-  if (!card) return;
-  const saved = session || loadSession();
-  if (!saved || !saved.room) { card.classList.add('hidden'); return; }
-  const meta = gameMeta(saved.game);
-  const modeText = saved.mode === 'computer' ? 'offline vs computer' : saved.bot ? 'vs Botty' : 'live room';
-  $('resumeText').textContent = `${(meta && meta.name) || saved.game || 'Game'} - ${modeText} - room ${saved.room}`;
-  card.classList.remove('hidden');
+function timeAgo(ms) {
+  const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
-function resumeSavedGame() {
-  session = session || loadSession();
-  if (!session || !session.room) { updateResumeCard(); return; }
-  show(sectionForGame(session.game));
+// Home screen list of every saved game (kept under its old name: show('home') calls it).
+function updateResumeCard() {
+  const wrap = $('savedGames');
+  const list = $('savedList');
+  if (!wrap || !list) return;
+  const games = loadSavedGames();
+  wrap.classList.toggle('hidden', !games.length);
+  list.innerHTML = '';
+  games.forEach(entry => {
+    const meta = gameMeta(entry.game);
+    const who = entry.mode === 'computer' ? 'vs computer'
+      : entry.bot ? 'vs Botty'
+      : entry.opponent ? `vs ${entry.opponent}` : `room ${entry.room}, waiting`;
+    const row = document.createElement('div');
+    row.className = 'saved-game' + (entry.over ? ' over' : '');
+    const info = document.createElement('div');
+    info.className = 'saved-info';
+    const name = document.createElement('span');
+    name.className = 'saved-name';
+    name.textContent = (meta && meta.name) || entry.game || 'Game';
+    const sub = document.createElement('span');
+    sub.className = 'saved-meta';
+    sub.textContent = [who, entry.over ? 'finished' : null, timeAgo(entry.savedAt || Date.now())].filter(Boolean).join(' - ');
+    info.append(name, sub);
+    const resume = document.createElement('button');
+    resume.className = entry.over ? 'ghost' : 'primary';
+    resume.textContent = entry.over ? 'View' : 'Resume';
+    resume.onclick = () => resumeSavedGame(entry);
+    const drop = document.createElement('button');
+    drop.className = 'ghost saved-drop';
+    drop.textContent = '\u00d7'; // multiplication sign
+    drop.setAttribute('aria-label', `Discard ${name.textContent} ${who}`);
+    drop.onclick = () => discardSavedGame(entry);
+    row.append(info, resume, drop);
+    list.appendChild(row);
+  });
+}
+
+function resumeSavedGame(entry) {
+  if (!entry || !entry.room) { updateResumeCard(); return; }
+  stopPoll();
+  resetGameUi();
+  lastView = null;
+  setSession({ ...entry });
+  show(sectionForGame(entry.game));
   enterRoom();
 }
 
-function discardSavedGame() {
-  if (!confirm('Discard the saved game? The room code and seat are forgotten on this device.')) return;
-  clearSession();
+function discardSavedGame(entry) {
+  if (!entry) return;
+  const prompt = entry.over ? null
+    : entry.mode === 'computer' ? 'Delete this offline game?'
+    : `Forget this game? Your seat in room ${entry.room} cannot be recovered on this device.`;
+  if (prompt && !confirm(prompt)) return;
+  forgetGame(entry);
+  if (sameSavedGame(session, entry)) detachSession();
   updateResumeCard();
 }
 
+// Keep the saved entry's opponent name and finished flag current for the home list.
+function noteSavedGame(d, v) {
+  if (!session || !session.room) return;
+  const opponent = d.opponentName || '';
+  const over = v.phase === 'over';
+  if ((session.opponent || '') === opponent && !!session.over === over) return;
+  setSession({ ...session, opponent, over });
+}
+
+// Back to the home screen. An unfinished game stays saved; a finished one is cleared.
 function leaveGame() {
-  if (!confirm('Leave this game? This clears the saved local session for this device.')) return;
+  if (session && lastView && lastView.phase === 'over') clearSession();
+  else detachSession();
+  stopPoll();
+  resetGameUi();
+  lastView = null;
+  show('home');
+  $('foot').textContent = '';
+}
+
+// A live room nobody has joined yet: cancelling throws it away.
+function cancelLobby() {
   clearSession();
   stopPoll();
   resetGameUi();
@@ -256,13 +356,15 @@ async function postMove(move) {
   finally { moveInFlight = false; }
 }
 
-// Solo rooms live in localStorage under their own key; drop any that do not
-// belong to the current session so abandoned offline games do not pile up.
-function pruneSoloRooms(keepRoom) {
+// Solo rooms live in localStorage under their own key; drop any that no saved
+// game points at, so discarded or overflowed offline games do not pile up.
+function pruneSoloRooms() {
   try {
     const prefix = 'turn-based-games-solo-';
+    const keep = new Set(loadSavedGames().filter(s => s.mode === 'computer').map(s => prefix + s.room));
+    if (session && session.mode === 'computer' && session.room) keep.add(prefix + session.room);
     Object.keys(localStorage)
-      .filter(k => k.startsWith(prefix) && k !== prefix + keepRoom)
+      .filter(k => k.startsWith(prefix) && !keep.has(k))
       .forEach(k => localStorage.removeItem(k));
   } catch {}
 }
@@ -318,6 +420,7 @@ function render(d) {
   updateSoloRestartButtons();
   const v = d.view;
   lastView = v;
+  noteSavedGame(d, v);
   fleetDef = v.fleet || fleetDef || [];
   boardSize = v.size || boardSize;
   $('foot').textContent = `Game ${session.room} - ${d.youName}` + (d.opponentName ? ` vs ${d.opponentName}` : '');
@@ -2925,13 +3028,17 @@ populateGameSelect();
 const params = launchParams();
 applyLaunchGame(params.game);
 session = loadSession();
-pruneSoloRooms(session && session.mode === 'computer' ? session.room : null);
-// The home screen is always the landing page. A saved session becomes a
-// Resume card there instead of auto-teleporting into the old game; only an
-// explicit ?mode=computer&game=x launch link jumps straight into play.
+if (session && session.room) rememberGame(session, false); // carry over a pre-list single save
+pruneSoloRooms();
+// The home screen is always the landing page, listing saved games instead of
+// auto-teleporting into one; only an explicit ?mode=computer&game=x launch link
+// jumps straight into play: the newest unfinished offline game of that kind, or
+// a new one. Other saved games stay saved either way.
 const launchGame = params.mode === 'computer' && params.game && gameMeta(params.game) ? params.game : null;
-if (session && launchGame && !(session.mode === 'computer' && session.game === launchGame)) {
-  clearSession();
+if (launchGame && !(session && session.mode === 'computer' && session.game === launchGame)) {
+  const saved = loadSavedGames().find(s => s.mode === 'computer' && s.game === launchGame && !s.over);
+  detachSession();
+  if (saved) setSession({ ...saved });
 }
 if (session && launchGame) {
   show(sectionForGame(session.game));

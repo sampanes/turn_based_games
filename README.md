@@ -26,7 +26,8 @@ Publish the repository from the default branch root with GitHub Pages. The one a
 only landing page is the client at `public/`; the repository root `index.html` (and
 `404.html`) just forward there so old links keep working.
 
-Example launch paths (a launch link always wins over a leftover saved session):
+Example launch paths (a launch link opens that game: your newest unfinished offline game
+of that kind, or a new one):
 
 ```text
 public/?mode=computer&game=battleship
@@ -39,6 +40,19 @@ public/?mode=computer&game=onecard
 
 Solo rooms live only in browser `localStorage`; no server or shared database is used.
 The deployment URL is available from the repository's Pages settings after publishing.
+
+### Saved games
+
+The home screen lists every game the browser holds a seat in (up to 12, newest first):
+live rooms with the opponent's name, Botty rooms, and offline games. **Home** inside a game
+returns there and keeps an unfinished game saved; a finished game is cleared when you
+leave it, and the x on a list entry discards it. Starting another game never forgets an
+unfinished one, so a live game can be picked up days later from the same browser, as long
+as the room has not expired on the server (`ROOM_TTL_DAYS`).
+
+Saves are per browser and per address: `http://127.0.0.1:8080`, `http://localhost:8080`
+and the private Tailscale URL each keep their own list, and a private window or clearing
+site data loses it. A forgotten seat cannot be reclaimed by entering the room code again.
 
 ## Local Multiplayer
 

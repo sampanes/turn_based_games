@@ -92,8 +92,14 @@
   }
   .resume-card strong { display: block; color: var(--amber); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
   .resume-card span { color: var(--ink); font-size: 14px; }
-  .resume-actions { display: flex; gap: 8px; margin-top: 10px; }
-  .resume-actions button { flex: 1; }
+  .saved-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .saved-game { display: flex; align-items: center; gap: 8px; }
+  .saved-game.over { opacity: .7; }
+  .saved-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .resume-card .saved-name { color: var(--ink); font-size: 15px; font-weight: 600; }
+  .resume-card .saved-meta { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .saved-game button { flex: 0 0 auto; width: auto; padding-inline: 16px; }
+  .saved-game .saved-drop { padding-inline: 0; width: var(--tap-target, 44px); }
 
   /* code share */
   .code-badge {
@@ -1170,13 +1176,9 @@
 
   <!-- HOME -->
   <section id="home" class="card hidden">
-    <div id="resumeCard" class="resume-card hidden">
-      <strong>Game in progress</strong>
-      <span id="resumeText">...</span>
-      <div class="resume-actions">
-        <button class="primary" onclick="resumeSavedGame()">Resume</button>
-        <button class="ghost" onclick="discardSavedGame()">Discard</button>
-      </div>
+    <div id="savedGames" class="resume-card hidden">
+      <strong>Your games</strong>
+      <div id="savedList" class="saved-list"></div>
     </div>
     <h2>New engagement</h2>
     <label for="gameSelect">Game</label>
@@ -1203,7 +1205,7 @@
     <div class="code-badge" id="lobbyCode">....</div>
     <button class="primary" style="width:100%" onclick="copyRoomCode()">Copy invite code</button>
     <div class="waiting mt"><span class="blip"></span> waiting for your opponent to join...</div>
-    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Cancel</button>
+    <button class="ghost mt" style="width:100%" onclick="cancelLobby()">Cancel</button>
   </section>
 
   <!-- PLACEMENT -->
@@ -1245,7 +1247,7 @@
       <button id="fireBtn" class="primary fire-btn" onclick="confirmFire()" disabled>FIRE</button>
       <button id="fxBtn" class="ghost dock-small fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary dock-small solo-restart hidden" onclick="restartComputerGame()">New game</button>
-      <button class="ghost dock-small" onclick="leaveGame()">Leave</button>
+      <button class="ghost dock-small" onclick="leaveGame()">Home</button>
     </div>
   </section>
 
@@ -1301,7 +1303,7 @@
       <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
       <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
-      <button class="ghost" onclick="leaveGame()">Leave</button>
+      <button class="ghost" onclick="leaveGame()">Home</button>
     </div>
   </section>
 
@@ -1342,7 +1344,7 @@
       <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
       <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
-      <button class="ghost" onclick="leaveGame()">Leave</button>
+      <button class="ghost" onclick="leaveGame()">Home</button>
     </div>
   </section>
 
@@ -1375,7 +1377,7 @@
       <button id="oneCardDraw" class="primary fire-btn" onclick="drawOneCard()" disabled>DRAW</button>
       <button class="ghost dock-small fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary dock-small solo-restart hidden" onclick="restartComputerGame()">New game</button>
-      <button class="ghost dock-small" onclick="leaveGame()">Leave</button>
+      <button class="ghost dock-small" onclick="leaveGame()">Home</button>
     </div>
     <div id="unoColorPick" class="uno-color-pick hidden">
       <div class="uno-color-box">
@@ -1400,7 +1402,7 @@
     <div class="battle-dock">
       <button class="ghost dock-small fx-btn" onclick="toggleBattleFx()">FX on</button>
       <button class="primary dock-small solo-restart hidden" onclick="restartComputerGame()">New game</button>
-      <button class="ghost dock-small" onclick="leaveGame()">Leave</button>
+      <button class="ghost dock-small" onclick="leaveGame()">Home</button>
     </div>
   </section>
 
@@ -1412,7 +1414,7 @@
     </div>
     <div class="uttt-legend" id="utttLegend"></div>
     <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
-    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Resign / leave</button>
+    <button class="ghost mt" style="width:100%" onclick="leaveGame()">Home</button>
   </section>
 
   <div class="footnote" id="foot"></div>
