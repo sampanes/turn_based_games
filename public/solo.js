@@ -21,7 +21,7 @@
 
   function computerMove(room, slot) {
     if (typeof room.game.computerMove !== 'function') throw new Error('This game does not have a computer opponent yet.');
-    return room.game.computerMove(room.state, slot);
+    return room.game.computerMove(room.state, slot, room.level || 'normal');
   }
 
   // The computer "thinks" between moves instead of answering inside the same
@@ -65,12 +65,13 @@
       gameName,
       game,
       humanToken: tok,
+      level: ['easy', 'normal', 'hard'].includes(body.level) ? body.level : 'normal',
       players: [{ slot: 'A', name: body.name || 'Player 1', human: true }, ...computers],
       state: game.init(),
     };
     if (typeof game.onPlayerJoined === 'function') room.players.forEach(player => game.onPlayerJoined(room.state, player.slot));
     storeRoom(room);
-    return { room: code, token: tok, you: 'A', game: gameName, mode: 'computer' };
+    return { room: code, token: tok, you: 'A', game: gameName, mode: 'computer', level: room.level };
   }
 
   function requireRoom(session, token, helpers) {
@@ -127,6 +128,7 @@
         players: publicPlayers(room),
         minPlayers: (room.game.meta && room.game.meta.minPlayers) || 2,
         maxPlayers: (room.game.meta && room.game.meta.maxPlayers) || 2,
+        botLevel: room.level || 'normal',
         view: room.game.viewFor(room.state, 'A', publicPlayers(room)),
       };
     }

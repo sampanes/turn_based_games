@@ -1186,6 +1186,12 @@
     <label for="name1">Your call sign</label>
     <input id="name1" maxlength="16" placeholder="e.g. Skipper">
     <button class="primary mt" style="width:100%" onclick="createGame()">Start live multiplayer</button>
+    <label for="botLevel">Computer skill</label>
+    <select id="botLevel" onchange="saveBotLevel()">
+      <option value="easy">Easy - still learning</option>
+      <option value="normal">Normal</option>
+      <option value="hard">Hard - no mercy</option>
+    </select>
     <button class="mt" style="width:100%" onclick="createBottyGame()">Play Botty - save on server</button>
     <button class="ghost mt" style="width:100%" onclick="createComputerGame()">Play offline vs computer</button>
     <p class="lede mt">Botty is always available while the server is running, and the room resumes from server storage. Offline mode stays in this browser and uses the same shared rules.</p>

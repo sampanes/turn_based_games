@@ -232,19 +232,23 @@
       };
     },
 
-    computerMove(state, who) {
+    // easy: usually closes a box it sees, otherwise draws any line (often
+    // handing you boxes). normal: the careful bot, but now and then it draws a
+    // careless line. hard: always closes boxes and never gives one away while
+    // a safe line remains, then gives away as little as it can.
+    computerMove(state, who, level = 'normal') {
       const moves = legalMovesFromEdges(state.edges);
       if (!moves.length) return null;
-      let best = moves[0];
-      let bestScore = -Infinity;
-      for (const move of moves) {
-        const score = setupScore(state, move, who);
-        if (score > bestScore) {
-          best = move;
-          bestScore = score;
-        }
+      const pick = list => list[Math.floor(Math.random() * list.length)];
+      const asMove = m => ({ type: m.type, r: m.r, c: m.c });
+      if (level === 'easy') {
+        const closing = moves.filter(m => simulateClaim(state, who, m).completed.length);
+        return asMove(closing.length && Math.random() < 0.7 ? pick(closing) : pick(moves));
       }
-      return { type: best.type, r: best.r, c: best.c };
+      const scored = moves.map(move => ({ move, score: setupScore(state, move, who) }));
+      const top = Math.max(...scored.map(s => s.score));
+      if (level !== 'hard' && top < 1000 && Math.random() < 0.15) return asMove(pick(moves));
+      return asMove(pick(scored.filter(s => s.score === top)).move);
     },
   };
 

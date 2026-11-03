@@ -35,6 +35,8 @@ const ROOM_TTL_DAYS = envInteger('ROOM_TTL_DAYS', 90, 1, 3650);
 const ROOM_TTL_MS = ROOM_TTL_DAYS * 24 * 60 * 60 * 1000;
 const RATE_LIMIT_PER_MINUTE = envInteger('RATE_LIMIT_PER_MINUTE', 900, 60, 10000);
 const BOT_MOVE_DELAY_MS = envInteger('BOT_MOVE_DELAY_MS', 650, 0, 5000);
+const BOT_LEVELS = ['easy', 'normal', 'hard'];
+function cleanLevel(value) { return BOT_LEVELS.includes(value) ? value : 'normal'; }
 
 // ---------------------------------------------------------------- persistence
 let db = { rooms: {} };
@@ -141,7 +143,7 @@ function advanceBotIfReady(room, now = Date.now()) {
   if (!isBotTurn(room) || room.botReadyAt > now) return false;
   const who = room.state.turn;
   const game = games[room.game];
-  const move = game.computerMove(room.state, who);
+  const move = game.computerMove(room.state, who, cleanLevel(room.botLevel));
   if (!move) {
     room.botReadyAt = now + Math.max(BOT_MOVE_DELAY_MS, 1000);
     return false;
@@ -228,6 +230,7 @@ function handleApi(req, res, body) {
     db.rooms[code].players.A = { token: tok, name: cleanName(body.name, 'Player 1') };
     notifyJoin(db.rooms[code], 'A');
     if (body.bot === true) {
+      db.rooms[code].botLevel = cleanLevel(body.level);
       const botError = seatBotty(db.rooms[code]);
       if (botError) {
         delete db.rooms[code];
@@ -235,7 +238,7 @@ function handleApi(req, res, body) {
       }
     }
     save();
-    return send(res, 200, { room: code, token: tok, you: 'A', game: type, bot: body.bot === true });
+    return send(res, 200, { room: code, token: tok, you: 'A', game: type, bot: body.bot === true, level: body.bot === true ? db.rooms[code].botLevel : undefined });
   }
 
   if (route === '/api/join' && req.method === 'POST') {
@@ -296,6 +299,7 @@ function handleApi(req, res, body) {
       players: publicPlayers(room),
       minPlayers: minPlayers(room.game),
       maxPlayers: maxPlayers(room.game),
+      botLevel: room.botRoom ? cleanLevel(room.botLevel) : null,
       view: games[room.game].viewFor(room.state, who, publicPlayers(room)),
     });
   }

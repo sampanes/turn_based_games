@@ -219,24 +219,30 @@
       };
     },
 
-    computerMove(state, who) {
+    // easy: half the time any pit, otherwise the best-looking single move.
+    // normal: looks two moves ahead. hard: looks six moves ahead.
+    computerMove(state, who, level = 'normal') {
       const myRange = who === 'A' ? [0,1,2,3,4,5] : [7,8,9,10,11,12];
       const moves = myRange.filter(i => state.pits[i] > 0);
       if (!moves.length) return null;
+      if (level === 'easy' && Math.random() < 0.5) return { pit: moves[Math.floor(Math.random() * moves.length)] };
+      const depth = level === 'easy' ? 0 : level === 'hard' ? 6 : 2;
 
       const myStore = who === 'A' ? 6 : 13;
       const sign = who === 'A' ? 1 : -1;
-      let bestIdx = moves[0], bestVal = -Infinity;
+      let best = [], bestVal = -Infinity;
 
       for (const idx of moves) {
         const s = sowStones(state.pits, idx, who);
         const cap = tryCapture(s.pits, s.last, who);
         const nextWho = s.last === myStore ? who : (who === 'A' ? 'B' : 'A');
-        const val = sign * minimax(cap.pits, nextWho, 6, -Infinity, Infinity);
-        if (val > bestVal) { bestVal = val; bestIdx = idx; }
+        const val = sign * minimax(cap.pits, nextWho, depth, -Infinity, Infinity);
+        if (val > bestVal) { bestVal = val; best = [idx]; }
+        else if (val === bestVal) best.push(idx);
       }
 
-      return { pit: bestIdx };
+      // Ties go to a random pit so two games never play out the same way.
+      return { pit: best[Math.floor(Math.random() * best.length)] };
     },
   };
 

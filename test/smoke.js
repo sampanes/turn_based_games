@@ -150,6 +150,30 @@ function testBattleshipCanonicalCells() {
   assert.strictEqual(bs.validateSetup(bs.init(), 'A', [null, null, null, null, null]), 'Bad ship.');
 }
 
+// Every skill level must play only legal moves and finish a game.
+function testBotLevelsPlayLegalGames() {
+  const two = [{ slot: 'A', name: 'A' }, { slot: 'B', name: 'B' }];
+  const setups = {
+    battleship: (g, s) => { g.validateSetup(s, 'A', g.computerSetup()); g.validateSetup(s, 'B', g.computerSetup()); },
+    onecard: (g, s) => { ['A', 'B'].forEach(x => g.onPlayerJoined(s, x)); g.applyMove(s, 'A', { action: 'start' }, two); },
+  };
+  for (const id of ['battleship', 'connectfour', 'dotsboxes', 'mancala', 'onecard', 'ultimatettt']) {
+    const game = require(`../public/games/${id}`);
+    for (const [a, b] of [['easy', 'hard'], ['hard', 'normal'], ['normal', 'easy'], [undefined, 'bogus']]) {
+      const levels = { A: a, B: b };
+      const state = game.init();
+      if (setups[id]) setups[id](game, state);
+      for (let n = 0; state.phase !== 'over'; n++) {
+        assert.ok(n < 3000, `${id} ${a} vs ${b} never finished`);
+        const who = state.turn;
+        const move = game.computerMove(state, who, levels[who]);
+        assert.ok(move, `${id} ${levels[who]} returned no move`);
+        assert.strictEqual(game.applyMove(state, who, move, two), null, `${id} ${levels[who]} played ${JSON.stringify(move)}`);
+      }
+    }
+  }
+}
+
 function fleet() {
   return [
     { name: 'Carrier', cells: ['0,0', '0,1', '0,2', '0,3', '0,4'] },
@@ -165,6 +189,7 @@ async function main() {
   testMancalaMoveIdentity();
   testDotsBoxesScoring();
   testBattleshipCanonicalCells();
+  testBotLevelsPlayLegalGames();
   try { fs.unlinkSync(dataFile); } catch {}
   fs.writeFileSync(dataFile, JSON.stringify({
     rooms: {
@@ -315,16 +340,22 @@ async function main() {
       game: 'connectfour',
       name: 'Human',
       bot: true,
+      level: 'easy',
     });
     assert.strictEqual(botCreated.status, 200);
     assert.strictEqual(botCreated.data.bot, true);
+    assert.strictEqual(botCreated.data.level, 'easy');
 
     const botInitial = await request(port, 'GET', `/api/state?room=${botCreated.data.room}`, null, {
       Authorization: `Bearer ${botCreated.data.token}`,
     });
     assert.strictEqual(botInitial.status, 200);
     assert.strictEqual(botInitial.data.opponentName, 'Botty');
+    assert.strictEqual(botInitial.data.botLevel, 'easy');
     assert.strictEqual(botInitial.data.view.turn, 'A');
+
+    const oddLevel = await request(port, 'POST', '/api/create', { game: 'mancala', name: 'Human', bot: true, level: 'nightmare' });
+    assert.strictEqual(oddLevel.data.level, 'normal');
 
     const botJoinDeny = await request(port, 'POST', '/api/join', {
       room: botCreated.data.room,

@@ -122,6 +122,36 @@ function firstLegalMove(state, who) {
   if (!card) return { action: 'draw' };
   return { action: 'play', cardId: card.id, color: card.color === 'wild' ? mostCommonColor(state.hands[who]) : card.color };
 }
+function randomLegalMove(state, who) {
+  const legal = legalCards(state, who);
+  if (!legal.length) return { action: 'draw' };
+  const card = legal[Math.floor(Math.random() * legal.length)];
+  return { action: 'play', cardId: card.id, color: card.color === 'wild' ? ONECARD_COLORS[Math.floor(Math.random() * ONECARD_COLORS.length)] : card.color };
+}
+// Plays like a careful person: keeps wilds for when nothing else fits, sticks
+// to the color it holds most of, and hits the next player with skips and
+// draws when that player is close to going out.
+function smartMove(state, who) {
+  const legal = legalCards(state, who);
+  if (!legal.length) return { action: 'draw' };
+  const hand = state.hands[who] || [];
+  const players = activePlayers(state);
+  const next = players[(players.indexOf(who) + state.direction + players.length) % players.length];
+  const nextCount = next && next !== who ? (state.hands[next] || []).length : 99;
+  const colorCount = color => hand.filter(card => card.color === color).length;
+  const attack = { skip: 1, reverse: players.length === 2 ? 1 : 0, draw2: 2, wild4: 3 };
+  const score = card => {
+    let s = 0;
+    if (card.color === 'wild') s -= hand.length > 2 ? 40 : 0;
+    else s += colorCount(card.color) * 3;
+    if (nextCount <= 2) s += (attack[card.kind] || 0) * 30;
+    else if (card.kind !== 'number' && card.color !== 'wild') s += 2;
+    return s;
+  };
+  const card = legal.slice().sort((a, b) => score(b) - score(a))[0];
+  const rest = hand.filter(c => c.id !== card.id);
+  return { action: 'play', cardId: card.id, color: card.color === 'wild' ? mostCommonColor(rest.length ? rest : hand) : card.color };
+}
 // Rolling public-action log so clients can animate every play/draw since
 // their last poll (solo bots resolve several turns inside a single poll).
 // Only public information goes in here: played cards and draw COUNTS.
@@ -159,7 +189,11 @@ const onecard = {
     ];
   },
   computerSetup() { return null; },
-  computerMove(state, who) { return firstLegalMove(state, who); },
+  computerMove(state, who, level) {
+    if (level === 'easy') return randomLegalMove(state, who);
+    if (level === 'hard') return smartMove(state, who);
+    return firstLegalMove(state, who);
+  },
   onPlayerJoined(state, who) { ensurePlayer(state, who); },
 
   init() {

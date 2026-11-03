@@ -239,7 +239,11 @@
       };
     },
 
-    computerMove(state, who) {
+    // easy: takes a game win, sometimes a small-board win, otherwise random.
+    // normal: wins and blocks games and small boards, otherwise random.
+    // hard: the champion net in the browser; elsewhere (or until it loads) the
+    // normal bot, but it avoids sending you to a board you can win at once.
+    computerMove(state, who, level = 'normal') {
       const myPiece = who === 'A' ? X : O;
       const oppPiece = who === 'A' ? O : X;
       const valid = validMoves(state.board, state.lastMove, state.miniWinners);
@@ -248,7 +252,7 @@
 
       // Champion net first (browser). While it computes, return null so the
       // poll loop retries; while it loads (or if it failed), play heuristic.
-      if (brainUsable()) {
+      if (level === 'hard' && brainUsable()) {
         if (brain.status === 'idle') brainInit();
         if (brain.status === 'ready') {
           const key = stateKey(state);
@@ -275,11 +279,32 @@
         return checkMiniWin(getMiniIndices(getMiniIndex(idx)).map(i => b2[i])) === piece;
       };
 
+      const pick = list => list[Math.floor(Math.random() * list.length)];
       for (const idx of valid) if (winsGame(idx, myPiece)) return { idx };
+      if (level === 'easy') {
+        if (Math.random() < 0.5) for (const idx of valid) if (winsMini(idx, myPiece)) return { idx };
+        return { idx: pick(valid) };
+      }
       for (const idx of valid) if (winsGame(idx, oppPiece)) return { idx };
       for (const idx of valid) if (winsMini(idx, myPiece)) return { idx };
       for (const idx of valid) if (winsMini(idx, oppPiece)) return { idx };
-      return { idx: valid[Math.floor(Math.random() * valid.length)] };
+      if (level === 'hard') {
+        // Where the reply would land: a free choice, or a board the opponent
+        // can win with one move, both hand them a chance.
+        const givesChance = idx => {
+          const { board: b2, miniWinners: mw2 } = simPlace(state.board, state.miniWinners, idx, myPiece);
+          if (checkUltimateWin(mw2) !== null) return false;
+          const target = getNextMini(idx);
+          if (mw2[target] !== EMPTY) return true;
+          return validMoves(b2, idx, mw2).some(r => {
+            const { board: b3 } = simPlace(b2, mw2, r, oppPiece);
+            return checkMiniWin(getMiniIndices(target).map(i => b3[i])) === oppPiece;
+          });
+        };
+        const safe = valid.filter(idx => !givesChance(idx));
+        if (safe.length) return { idx: pick(safe) };
+      }
+      return { idx: pick(valid) };
     },
   };
 

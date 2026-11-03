@@ -40,22 +40,58 @@ function randomFleet() {
   return ships;
 }
 
-function computerShot(state, who) {
+// Skill levels. easy: fires at random and only now and then follows up a hit.
+// normal: random hunting, then works the cells around an unsunk hit.
+// hard: scores every cell by how many ways the ships still afloat could cover
+// it (only through unsunk hits while it has one), and fires at the best.
+function computerShot(state, who, level = 'normal') {
   const view = battleship.viewFor(state, who);
-  const candidates = [];
-  const neighboringHits = [];
-  for (let r = 0; r < view.size; r++) for (let c = 0; c < view.size; c++) {
-    const result = view.firingBoard[r][c];
-    if (!result) candidates.push({ r, c });
-    if (result === 'hit') {
-      for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-        const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < view.size && nc >= 0 && nc < view.size && !view.firingBoard[nr][nc]) neighboringHits.push({ r: nr, c: nc });
-      }
+  const n = view.size;
+  const at = (r, c) => view.firingBoard[r][c];
+  const inside = (r, c) => r >= 0 && r < n && c >= 0 && c < n;
+  const pick = list => list[Math.floor(Math.random() * list.length)] || null;
+  // Sunk ships are public, so their hits no longer need following up.
+  const sunkCells = new Set(view.enemyFleet.filter(s => s.sunk && s.cells).flatMap(s => s.cells));
+  const open = [];
+  const live = [];
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (!at(r, c)) open.push({ r, c });
+    else if (at(r, c) === 'hit' && !sunkCells.has(`${r},${c}`)) live.push({ r, c });
+  }
+  if (!open.length) return null;
+
+  const near = [];
+  const seen = new Set();
+  for (const h of live) for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const r = h.r + dr, c = h.c + dc;
+    if (inside(r, c) && !at(r, c) && !seen.has(`${r},${c}`)) { seen.add(`${r},${c}`); near.push({ r, c }); }
+  }
+
+  if (level === 'easy') return near.length && Math.random() < 0.25 ? pick(near) : pick(open);
+  if (level !== 'hard') return pick(near.length ? near : open);
+
+  const liveSet = new Set(live.map(h => `${h.r},${h.c}`));
+  const blocked = (r, c) => at(r, c) === 'miss' || sunkCells.has(`${r},${c}`);
+  const score = Array.from({ length: n }, () => new Array(n).fill(0));
+  const sizes = view.enemyFleet.filter(s => !s.sunk).map(s => s.size);
+  for (const size of sizes) for (const [dr, dc] of [[0, 1], [1, 0]]) {
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+      const cells = [];
+      for (let i = 0; i < size; i++) cells.push([r + dr * i, c + dc * i]);
+      if (!cells.every(([rr, cc]) => inside(rr, cc) && !blocked(rr, cc))) continue;
+      const hits = cells.filter(([rr, cc]) => liveSet.has(`${rr},${cc}`)).length;
+      if (live.length && !hits) continue;
+      const weight = Math.pow(20, hits);
+      for (const [rr, cc] of cells) if (!at(rr, cc)) score[rr][cc] += weight;
     }
   }
-  const pool = neighboringHits.length ? neighboringHits : candidates;
-  return pool[Math.floor(Math.random() * pool.length)] || null;
+  let best = [], bestScore = 0;
+  for (const cell of open) {
+    const s = score[cell.r][cell.c];
+    if (s > bestScore) { best = [cell]; bestScore = s; }
+    else if (s === bestScore && s > 0) best.push(cell);
+  }
+  return pick(best.length ? best : (near.length ? near : open));
 }
 
 const battleship = {
@@ -63,8 +99,8 @@ const battleship = {
     return randomFleet();
   },
 
-  computerMove(state, who) {
-    return computerShot(state, who);
+  computerMove(state, who, level) {
+    return computerShot(state, who, level);
   },
 
   init() {

@@ -54,6 +54,25 @@ Saves are per browser and per address: `http://127.0.0.1:8081`, `http://localhos
 and the private Tailscale URL each keep their own list, and a private window or clearing
 site data loses it. A forgotten seat cannot be reclaimed by entering the room code again.
 
+### Computer skill
+
+The home screen's **Computer skill** picker (Easy, Normal, Hard) sets how well the
+offline computer and Botty play. The browser remembers the choice, each game keeps the
+level it started with (**New game** reuses it), and the footer and saved list show it.
+Games saved before levels existed play at Normal.
+
+| Game | Easy | Normal | Hard |
+|---|---|---|---|
+| Battleship | random shots, rarely follows a hit | follows up unsunk hits | fires where the remaining ships most likely sit |
+| Connect Four | often misses your threats | wins, blocks, one move ahead | six moves ahead |
+| Dots and Boxes | draws any line, usually takes boxes | careful, occasional slip | the careful bot with no slips |
+| Mancala | half random | two moves ahead | six moves ahead |
+| UNO | random legal card | first legal card | holds wilds, attacks a player about to go out |
+| Ultimate Tic-Tac-Toe | takes wins, otherwise random | wins and blocks boards | neural net on GitHub Pages; elsewhere also avoids handing you a board |
+
+Measured bot against bot (200 games per pairing for Battleship and Mancala, 40 for the
+rest, seats alternating), each level beats the one below it in every game; in UNO luck keeps it close.
+
 ## Local Multiplayer
 
 Node 16 or newer is required.
@@ -194,8 +213,9 @@ path outside the checkout if runtime state should live elsewhere.
 - Authenticated requests use a bearer token instead of putting tokens in URLs.
 - Static responses include browser security headers.
 - Browser assets are local; the client does not fetch third-party fonts or analytics.
-  One exception: offline Ultimate Tic-Tac-Toe on GitHub Pages loads onnxruntime-web from a
-  CDN and its neural-net opponent (~26 MB) from the companion model site. The local server's
+  One exception: offline Ultimate Tic-Tac-Toe at Hard skill on GitHub Pages loads
+  onnxruntime-web from a CDN and its neural-net opponent (~26 MB) from the companion model
+  site. The local server's
   Content-Security-Policy blocks both, so there the simpler built-in bot plays instead.
 - Request bodies are limited to 64 KiB.
 - API traffic is limited to 900 requests per identity per minute.
@@ -261,5 +281,5 @@ rules. A shared module under `public/games/` exposes:
 - `viewFor(state, player, players)`
 
 Optional computer-play hooks include `computerSetup()`, `computerPlayers()`, and
-`computerMove()`. Register a new module in both `public/games/registry.js` and
+`computerMove(state, player, level)`, where `level` is `easy`, `normal` or `hard`. Register a new module in both `public/games/registry.js` and
 `server/games/index.js`, add its browser script, and provide the matching UI.

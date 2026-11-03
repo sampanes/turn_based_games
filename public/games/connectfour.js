@@ -105,6 +105,52 @@ function pickComputerMove(state, player) {
   return { c: best };
 }
 
+function pickRandom(list) { return list[Math.floor(Math.random() * list.length)]; }
+function centerFirst(moves) { return moves.slice().sort((a, b) => Math.abs(a - 3) - Math.abs(b - 3)); }
+
+// A beginner: usually sees its own win, often misses yours, and otherwise
+// plays somewhere near the middle.
+function easyComputerMove(state, player) {
+  const moves = legalMoves(state.board);
+  if (Math.random() < 0.7) for (const col of moves) if (wouldWin(state.board, col, player)) return { c: col };
+  if (Math.random() < 0.4) for (const col of moves) if (wouldWin(state.board, col, other(player))) return { c: col };
+  return { c: pickRandom(moves.flatMap(col => new Array(4 - Math.abs(col - 3)).fill(col))) };
+}
+
+// Looks HARD_DEPTH moves ahead (alpha-beta), scoring the leaves with the
+// same window heuristic the normal bot uses for its one-move look.
+const HARD_DEPTH = 6;
+const WIN_SCORE = 1000000;
+function negamax(board, player, depth, alpha, beta) {
+  const moves = centerFirst(legalMoves(board));
+  if (!moves.length) return 0;
+  for (const col of moves) if (wouldWin(board, col, player)) return WIN_SCORE + depth;
+  if (depth === 0) return scoreBoard(board, player);
+  let best = -Infinity;
+  for (const col of moves) {
+    const copy = cloneBoard(board);
+    dropDisc(copy, col, player);
+    const value = -negamax(copy, other(player), depth - 1, -beta, -alpha);
+    if (value > best) best = value;
+    if (best > alpha) alpha = best;
+    if (alpha >= beta) break;
+  }
+  return best;
+}
+function hardComputerMove(state, player) {
+  const moves = centerFirst(legalMoves(state.board));
+  for (const col of moves) if (wouldWin(state.board, col, player)) return { c: col };
+  let best = [], bestScore = -Infinity;
+  for (const col of moves) {
+    const copy = cloneBoard(state.board);
+    dropDisc(copy, col, player);
+    const value = -negamax(copy, other(player), HARD_DEPTH - 1, -Infinity, Infinity);
+    if (value > bestScore) { best = [col]; bestScore = value; }
+    else if (value === bestScore) best.push(col);
+  }
+  return { c: pickRandom(best) };
+}
+
 const connectfour = {
   meta: {
     id: 'connectfour',
@@ -115,7 +161,12 @@ const connectfour = {
   },
 
   computerSetup() { return null; },
-  computerMove(state, who) { return pickComputerMove(state, who); },
+  computerMove(state, who, level) {
+    if (!legalMoves(state.board).length) return null;
+    if (level === 'easy') return easyComputerMove(state, who);
+    if (level === 'hard') return hardComputerMove(state, who);
+    return pickComputerMove(state, who);
+  },
 
   init() {
     return {

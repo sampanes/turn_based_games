@@ -110,6 +110,7 @@ function show(id) {
     if (el) el.classList.toggle('hidden', section !== id);
   });
   if (id === 'home') updateResumeCard();
+  else if ($('inviteNotice')) $('inviteNotice').classList.add('hidden');
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -194,13 +195,25 @@ async function createGame() {
     enterRoom();
   } catch (e) { toast(e.message); }
 }
+const BOT_LEVEL_KEY = 'turnBasedGamesBotLevel';
+const BOT_LEVEL_NAMES = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
+function botLevel() {
+  const v = $('botLevel') && $('botLevel').value;
+  return BOT_LEVEL_NAMES[v] ? v : 'normal';
+}
+function saveBotLevel() { try { localStorage.setItem(BOT_LEVEL_KEY, botLevel()); } catch {} }
+function loadBotLevel() {
+  let v = null;
+  try { v = localStorage.getItem(BOT_LEVEL_KEY); } catch {}
+  if ($('botLevel')) $('botLevel').value = BOT_LEVEL_NAMES[v] ? v : 'normal';
+}
 async function createBottyGame() {
   try {
     const meta = currentGameMeta();
     if (meta && meta.supportsComputer === false) return toast('Botty does not support that game yet.');
     const name = $('name1').value.trim() || 'Player 1';
-    const d = await api('/api/create', 'POST', { game: selectedGameId(), name, bot: true });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online', bot: true });
+    const d = await api('/api/create', 'POST', { game: selectedGameId(), name, bot: true, level: botLevel() });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online', bot: true, level: d.level || botLevel() });
     enterRoom();
   } catch (e) { toast(e.message); }
 }
@@ -208,8 +221,8 @@ async function createComputerGame() {
   try {
     const name = $('name1').value.trim() || 'Player 1';
     session = { mode: 'computer' };
-    const d = await api('/api/create', 'POST', { game: selectedGameId(), name });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer' });
+    const d = await api('/api/create', 'POST', { game: selectedGameId(), name, level: botLevel() });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer', level: d.level });
     enterRoom();
   } catch (e) { clearSession(); toast(e.message); }
 }
@@ -254,8 +267,9 @@ function updateResumeCard() {
   list.innerHTML = '';
   games.forEach(entry => {
     const meta = gameMeta(entry.game);
-    const who = entry.mode === 'computer' ? 'vs computer'
-      : entry.bot ? 'vs Botty'
+    const skill = BOT_LEVEL_NAMES[entry.level] ? ` (${BOT_LEVEL_NAMES[entry.level].toLowerCase()})` : '';
+    const who = entry.mode === 'computer' ? 'vs computer' + skill
+      : entry.bot ? 'vs Botty' + skill
       : entry.opponent ? `vs ${entry.opponent}` : `room ${entry.room}, waiting`;
     const row = document.createElement('div');
     row.className = 'saved-game' + (entry.over ? ' over' : '');
@@ -308,8 +322,9 @@ function noteSavedGame(d, v) {
   if (!session || !session.room) return;
   const opponent = d.opponentName || '';
   const over = v.phase === 'over';
-  if ((session.opponent || '') === opponent && !!session.over === over) return;
-  setSession({ ...session, opponent, over });
+  const level = BOT_LEVEL_NAMES[d.botLevel] ? d.botLevel : session.level;
+  if ((session.opponent || '') === opponent && !!session.over === over && session.level === level) return;
+  setSession({ ...session, opponent, over, ...(level ? { level } : {}) });
 }
 
 // Back to the home screen. An unfinished game stays saved; a finished one is cleared.
@@ -402,14 +417,15 @@ async function restartComputerGame() {
   const midGame = lastView && lastView.phase === 'battle' && (lastView.moveNumber == null || lastView.moveNumber > 0);
   if (midGame && !confirm('Start a new game? This one will be lost.')) return;
   const game = session.game || selectedGameId();
+  const level = session.level || botLevel();
   const name = ($('name1') && $('name1').value.trim()) || 'Player 1';
   try {
     clearSession();
     resetGameUi();
     lastView = null;
     session = { mode: 'computer' };
-    const d = await api('/api/create', 'POST', { game, name });
-    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer' });
+    const d = await api('/api/create', 'POST', { game, name, level });
+    setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer', level: d.level });
     toast('New game started.');
     enterRoom();
   } catch (e) { clearSession(); toast(e.message); }
@@ -450,7 +466,8 @@ function render(d) {
   noteSavedGame(d, v);
   fleetDef = v.fleet || fleetDef || [];
   boardSize = v.size || boardSize;
-  $('foot').textContent = `Game ${session.room} - ${d.youName}` + (d.opponentName ? ` vs ${d.opponentName}` : '');
+  $('foot').textContent = `Game ${session.room} - ${d.youName}` + (d.opponentName ? ` vs ${d.opponentName}` : '')
+    + (BOT_LEVEL_NAMES[d.botLevel] ? ` (${BOT_LEVEL_NAMES[d.botLevel]})` : '');
 
   if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; updateInvite(); return; }
 
@@ -3052,6 +3069,7 @@ document.addEventListener('keydown', e => {
 });
 
 populateGameSelect();
+loadBotLevel();
 const params = launchParams();
 applyLaunchGame(params.game);
 if (params.room && /^[A-Z0-9]{4}$/i.test(params.room)) {
