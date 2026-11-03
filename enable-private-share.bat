@@ -4,7 +4,7 @@ REM  Configure Tailscale Serve for private tailnet-only HTTPS access.
 REM  This does not use Tailscale Funnel and does not make the game public.
 REM ============================================================================
 setlocal
-set "PORT=8080"
+set "PORT=8081"
 
 where tailscale.exe >nul 2>&1
 if errorlevel 1 (

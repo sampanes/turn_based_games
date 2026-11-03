@@ -136,6 +136,7 @@ function launchParams() {
   return {
     mode: params.get('mode'),
     game: params.get('game'),
+    room: params.get('room'),
   };
 }
 function applyLaunchGame(gameId) {
@@ -149,6 +150,7 @@ function clearLaunchParams() {
   const url = new URL(window.location.href);
   url.searchParams.delete('mode');
   url.searchParams.delete('game');
+  url.searchParams.delete('room');
   window.history.replaceState({}, '', url.pathname + url.search + url.hash);
 }
 
@@ -341,6 +343,31 @@ async function copyRoomCode() {
   }
 }
 
+function inviteLink() {
+  const url = new URL(window.location.pathname, window.location.origin);
+  url.searchParams.set('room', session.room);
+  return url.toString();
+}
+function updateInvite() {
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  if ($('inviteLink').value !== inviteLink()) $('inviteLink').value = inviteLink();
+  $('inviteLocalWarning').classList.toggle('hidden', !local);
+}
+async function copyInvite() {
+  if (!session || !session.room) return;
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  if (local) return toast('Open the private HTTPS address first.');
+  const message = `Come play with me! Open ${inviteLink()} and tap Join.`;
+  try {
+    await navigator.clipboard.writeText(message);
+    toast('Invitation copied.');
+  } catch {
+    $('inviteLink').focus();
+    $('inviteLink').select();
+    toast('Select and copy the link.');
+  }
+}
+
 function enterRoom() { startPoll(); poll(); }
 
 // Sends one move, then waits for the fresh view before accepting another tap,
@@ -425,7 +452,7 @@ function render(d) {
   boardSize = v.size || boardSize;
   $('foot').textContent = `Game ${session.room} - ${d.youName}` + (d.opponentName ? ` vs ${d.opponentName}` : '');
 
-  if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; return; }
+  if (!d.opponentJoined) { show('lobby'); $('lobbyCode').textContent = session.room; updateInvite(); return; }
 
   const meta = currentGameMeta();
   if ((v.ui || (meta && meta.ui)) === 'mancala') {
@@ -3027,6 +3054,10 @@ document.addEventListener('keydown', e => {
 populateGameSelect();
 const params = launchParams();
 applyLaunchGame(params.game);
+if (params.room && /^[A-Z0-9]{4}$/i.test(params.room)) {
+  $('joinCode').value = params.room.toUpperCase();
+  $('inviteNotice').classList.remove('hidden');
+}
 session = loadSession();
 if (session && session.room) rememberGame(session, false); // carry over a pre-list single save
 pruneSoloRooms();

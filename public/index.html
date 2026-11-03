@@ -1191,6 +1191,7 @@
     <p class="lede mt">Botty is always available while the server is running, and the room resumes from server storage. Offline mode stays in this browser and uses the same shared rules.</p>
     <div class="divider">- OR -</div>
     <h2 style="margin-top:6px">Join a game</h2>
+    <p id="inviteNotice" class="lede hidden">You've been invited! Enter your name and tap Join.</p>
     <label for="joinCode">Game code</label>
     <input id="joinCode" class="code" maxlength="4" placeholder="...." autocomplete="off">
     <label for="name2">Your call sign</label>
@@ -1200,10 +1201,15 @@
 
   <!-- LOBBY: created, waiting for opponent -->
   <section id="lobby" class="card hidden">
-    <h2>Share this code with your opponent</h2>
-    <p class="lede">The second player opens this same page, taps "Join a game," and enters the room code. Both players can close the page and return later while the game waits on the server.</p>
+    <h2>Share with a friend to play</h2>
+    <p class="lede">Send your friend the invitation below. They can open the link, enter their name, and join your game.</p>
     <div class="code-badge" id="lobbyCode">....</div>
-    <button class="primary" style="width:100%" onclick="copyRoomCode()">Copy invite code</button>
+    <label for="inviteLink">Game address</label>
+    <input id="inviteLink" readonly onclick="this.select()" aria-label="Game invitation link">
+    <p id="inviteLocalWarning" class="lede hidden">This is a local address that only works on this device. Open the game using its private Tailscale HTTPS address before copying an invitation.</p>
+    <button class="primary mt" style="width:100%" onclick="copyInvite()">Copy invitation</button>
+    <button class="ghost mt" style="width:100%" onclick="copyRoomCode()">Copy room code</button>
+    <p class="lede mt">Share the link only with people you trust. Your friend needs access to the address this page is open on.</p>
     <div class="waiting mt"><span class="blip"></span> waiting for your opponent to join...</div>
     <button class="ghost mt" style="width:100%" onclick="cancelLobby()">Cancel</button>
   </section>

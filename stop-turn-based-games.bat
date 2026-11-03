@@ -5,7 +5,7 @@ REM  The private Tailscale route can remain configured while the backend is off.
 REM ============================================================================
 setlocal
 set "TITLE=turn-based-games"
-set "PORT=8080"
+set "PORT=8081"
 
 echo Stopping "%TITLE%" ...
 taskkill /FI "WINDOWTITLE eq %TITLE%*" /T /F >nul 2>&1

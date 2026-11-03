@@ -50,7 +50,7 @@ leave it, and the x on a list entry discards it. Starting another game never for
 unfinished one, so a live game can be picked up days later from the same browser, as long
 as the room has not expired on the server (`ROOM_TTL_DAYS`).
 
-Saves are per browser and per address: `http://127.0.0.1:8080`, `http://localhost:8080`
+Saves are per browser and per address: `http://127.0.0.1:8081`, `http://localhost:8081`
 and the private Tailscale URL each keep their own list, and a private window or clearing
 site data loses it. A forgotten seat cannot be reclaimed by entering the room code again.
 
@@ -72,7 +72,7 @@ The older `start-server.bat` and `stop-server.bat` files remain as compatibility
 The server listens only on:
 
 ```text
-http://127.0.0.1:8080/
+http://127.0.0.1:8081/
 ```
 
 It does not listen on the LAN or public internet by default.
@@ -88,7 +88,7 @@ npm start
 The intended private path is:
 
 ```text
-player browser -> private tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:8080
+player browser -> private tailnet HTTPS -> Tailscale Serve -> 127.0.0.1:8081
 ```
 
 One-time preparation:
@@ -109,7 +109,7 @@ than inviting someone into the entire tailnet. Keep recipient identities and acc
 rules in the Tailscale admin console rather than committing them to this repository.
 
 `enable-private-share.bat` uses Tailscale Serve, not Tailscale Funnel. Do not enable
-Funnel, forward port 8080 on a router, or add a public firewall rule for this service.
+Funnel, forward port 8081 on a router, or add a public firewall rule for this service.
 
 Tailscale Serve configuration can remain in place while the Node backend is stopped.
 The private URL will become usable again the next time the named server is started.
@@ -145,7 +145,7 @@ from everything else on the host:
 - Remove or rewrite every other rule whose `src` is `"*"`. Any one of them gives shared
   players access to the rest of the host again, whatever the game rule says.
 - Port 443 is the only port needed. Tailscale Serve terminates HTTPS on 443 and forwards
-  to the server, which listens on `127.0.0.1:8080` and is not reachable from the tailnet
+  to the server, which listens on `127.0.0.1:8081` and is not reachable from the tailnet
   directly.
 - This only governs people you **share** the machine with. Anyone you invite as a full
   member of your tailnet falls under the `autogroup:member` rule instead, so share the
@@ -211,7 +211,7 @@ Configuration can be adjusted with environment variables:
 | Variable | Default | Purpose |
 | --- | ---: | --- |
 | `HOST` | `127.0.0.1` | Listener address |
-| `PORT` | `8080` | Local HTTP port |
+| `PORT` | `8081` | Local HTTP port |
 | `DATA_FILE` | `./data.json` | Multiplayer state path |
 | `MAX_BODY_BYTES` | `65536` | Maximum API request body |
 | `RATE_LIMIT_PER_MINUTE` | `900` | API requests per identity |

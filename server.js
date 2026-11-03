@@ -25,7 +25,7 @@ function envInteger(name, fallback, min, max) {
   return Number.isFinite(value) && value >= min && value <= max ? value : fallback;
 }
 
-const PORT = envInteger('PORT', 8080, 0, 65535);
+const PORT = envInteger('PORT', 8081, 0, 65535);
 const HOST = process.env.HOST || '127.0.0.1';
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');

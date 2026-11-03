@@ -7,7 +7,7 @@ REM ============================================================================
 setlocal
 set "TITLE=turn-based-games"
 set "HOST=127.0.0.1"
-set "PORT=8080"
+set "PORT=8081"
 cd /d "%~dp0"
 
 taskkill /FI "WINDOWTITLE eq %TITLE%*" /T /F >nul 2>&1
