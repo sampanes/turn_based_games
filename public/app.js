@@ -308,8 +308,10 @@ function stopSavedStatusPoll() {
 }
 
 // Sort key: your turn, their turn, waiting for a player, vs computer, finished.
-// Within a group the game that has waited longest comes first.
+// Within a turn group the game that has waited longest comes first; computer
+// and finished games list the most recent first.
 const SAVED_RANK = { you: 0, them: 1, waiting: 2, computer: 3, over: 4 };
+const SAVED_NEWEST_FIRST = new Set(['computer', 'over']);
 function savedEntryStatus(entry) {
   if (entry.over) return { state: 'over', at: entry.savedAt || 0 };
   if (entry.mode === 'computer') return { state: 'computer', at: entry.savedAt || 0 };
@@ -329,7 +331,8 @@ function renderSavedList() {
   const list = $('savedList');
   if (!wrap || !list) return;
   const games = loadSavedGames().map(entry => ({ entry, status: savedEntryStatus(entry) }));
-  games.sort((a, b) => (SAVED_RANK[a.status.state] - SAVED_RANK[b.status.state]) || (a.status.at - b.status.at));
+  games.sort((a, b) => (SAVED_RANK[a.status.state] - SAVED_RANK[b.status.state])
+    || (SAVED_NEWEST_FIRST.has(a.status.state) ? b.status.at - a.status.at : a.status.at - b.status.at));
   wrap.classList.toggle('hidden', !games.length);
   list.innerHTML = '';
   games.forEach(({ entry, status }) => {
