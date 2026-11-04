@@ -192,10 +192,39 @@ immediately, while other players normally see it within one second without refre
 Mancala animates each pickup and drop and generates quiet browser-native sounds without
 downloading audio assets.
 
+### Turn alerts
+
+A player can get a phone or desktop notification when it becomes their turn. The **Turn
+alerts** box on the home screen turns them on for that device. It appears only when the
+page is served by this server, not on GitHub Pages, and it needs HTTPS, so use the private
+Tailscale address (`http://127.0.0.1` also works for testing on the host itself).
+
+- **iPhone or iPad (iOS 16.4 or later):** open the game in Safari, tap Share, then **Add
+  to Home Screen**, and open the game from that icon. Tap **Turn on alerts** there and
+  allow notifications. The home-screen app keeps its own saved games, separate from
+  Safari's, so start or join games from the icon after installing it. A game joined in
+  Safari stays in Safari.
+- **Android, Chrome or Edge on a computer:** tap **Turn on alerts** and allow
+  notifications.
+
+An alert goes to whoever has to move next after a person joins, places a fleet or moves,
+and to everyone else when a game ends. There are no alerts in Botty or offline games, or
+while that player's game screen is open. Tapping an alert opens the game, and a newer
+alert for the same game replaces the older one. Alerts turn on per device and cover
+every unfinished game saved on it, including games joined later. **Turn off** stops them.
+If notifications stop arriving after site data is cleared, turn alerts on again.
+
+Alerts travel through the browser maker's push service (Apple for iPhone, Google for
+Chrome and Android, Mozilla, Microsoft). This is the server's only outbound connection;
+nothing new can connect in. Each message is encrypted for the receiving device, so the
+push service cannot read it, and the server only accepts subscriptions on those services'
+own addresses.
+
 ## Persistent State
 
 Multiplayer state is stored in `data.json` beside `server.js` by default. It contains
-room state, display names, and secret player tokens, so it must remain private.
+room state, display names, secret player tokens, turn-alert subscriptions, and the
+server's turn-alert signing key, so it must remain private.
 
 `data.json`, temporary writes, and the `backups/` directory are excluded from Git.
 Create a local timestamped backup with:
@@ -204,7 +233,8 @@ Create a local timestamped backup with:
 backup-turn-based-games.bat
 ```
 
-Deleting `data.json` removes every multiplayer room. Set `DATA_FILE` to an absolute
+Deleting `data.json` removes every multiplayer room and makes a new turn-alert key, so
+every device has to turn alerts on again. Set `DATA_FILE` to an absolute
 path outside the checkout if runtime state should live elsewhere.
 
 ## Security Defaults
@@ -215,8 +245,10 @@ path outside the checkout if runtime state should live elsewhere.
 - Browser assets are local; the client does not fetch third-party fonts or analytics.
   One exception: offline Ultimate Tic-Tac-Toe at Hard skill on GitHub Pages loads
   onnxruntime-web from a CDN and its neural-net opponent (~26 MB) from the companion model
-  site. The local server's
-  Content-Security-Policy blocks both, so there the simpler built-in bot plays instead.
+  site. The local server's Content-Security-Policy blocks both, so there the simpler
+  built-in bot plays instead.
+- The only outbound traffic is turn alerts, sent to browser push services (see
+  [Turn alerts](#turn-alerts)).
 - Request bodies are limited to 64 KiB.
 - API traffic is limited to 900 requests per identity per minute.
 - At most 200 rooms are retained by default.
@@ -238,6 +270,7 @@ Configuration can be adjusted with environment variables:
 | `MAX_ROOMS` | `200` | Retained multiplayer rooms |
 | `ROOM_TTL_DAYS` | `90` | Inactive room lifetime |
 | `BOT_MOVE_DELAY_MS` | `650` | Pause before each server-side Botty move |
+| `PUSH_CONTACT` | repository URL | Contact (`mailto:` or `https:`) sent to push services with each alert |
 
 ## Test
 
@@ -260,8 +293,10 @@ public/
   index.html                     mobile-first game client (the landing page)
   app.js                         sessions, polling, animation, sound, and UI state
   solo.js                        browser-local computer-play adapter
+  sw.js                          service worker that shows turn alerts
   games/                         shared browser and server game rules
 server/games/                    Node wrappers for shared rules
+server/push.js                   zero-dependency Web Push (VAPID + aes128gcm)
 test/smoke.js                    zero-dependency server smoke test
 start-turn-based-games.bat       named Windows launcher
 status-turn-based-games.bat      process, listener, and private-share status
@@ -281,5 +316,6 @@ rules. A shared module under `public/games/` exposes:
 - `viewFor(state, player, players)`
 
 Optional computer-play hooks include `computerSetup()`, `computerPlayers()`, and
-`computerMove(state, player, level)`, where `level` is `easy`, `normal` or `hard`. Register a new module in both `public/games/registry.js` and
-`server/games/index.js`, add its browser script, and provide the matching UI.
+`computerMove(state, player, level)`, where `level` is `easy`, `normal` or `hard`.
+Register a new module in both `public/games/registry.js` and `server/games/index.js`, add
+its browser script, and provide the matching UI.

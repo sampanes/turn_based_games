@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const games = require('./server/games');
+const push = require('./server/push');
 
 function envInteger(name, fallback, min, max) {
   const value = Number.parseInt(process.env[name] || '', 10);
@@ -37,6 +38,10 @@ const RATE_LIMIT_PER_MINUTE = envInteger('RATE_LIMIT_PER_MINUTE', 900, 60, 10000
 const BOT_MOVE_DELAY_MS = envInteger('BOT_MOVE_DELAY_MS', 650, 0, 5000);
 const BOT_LEVELS = ['easy', 'normal', 'hard'];
 function cleanLevel(value) { return BOT_LEVELS.includes(value) ? value : 'normal'; }
+// Turn alerts (Web Push). The contact goes to the push services in each request.
+const PUSH_CONTACT = process.env.PUSH_CONTACT || 'https://github.com/sampanes/turn_based_games';
+const PUSH_TEST_ORIGIN = process.env.PUSH_TEST_ORIGIN || null; // test hook: one extra allowed endpoint origin
+const SEEN_WINDOW_MS = 4000; // the game screen polls every second while visible, so this means open now
 
 // ---------------------------------------------------------------- persistence
 let db = { rooms: {} };
@@ -44,6 +49,8 @@ try {
   if (fs.existsSync(DATA_FILE)) db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
 } catch (e) { console.error('Could not read data.json, starting fresh:', e.message); }
 if (!db || typeof db !== 'object' || !db.rooms || typeof db.rooms !== 'object') db = { rooms: {} };
+const hadPushKeys = !!(db.push && db.push.publicKey);
+const pushKeys = push.vapidKeys(db);
 
 let saveTimer = null;
 function save() {
@@ -161,6 +168,36 @@ function advanceBotIfReady(room, now = Date.now()) {
   return true;
 }
 
+// After a person acts in a room, alert whoever now has to act (or everyone
+// else, when the game just ended) unless they are looking at the game already.
+function turnAlerts(room, actor, verb, now = Date.now()) {
+  if (room.botRoom || !room.state) return;
+  const state = room.state;
+  const title = gameMeta(room.game).name || 'Turn-Based Games';
+  const actorName = (room.players[actor] && room.players[actor].name) || 'Your opponent';
+  const humans = roomPlayers(room).filter(slot => !room.players[slot].bot);
+  let targets = [];
+  if (state.phase === 'over') targets = humans.filter(slot => slot !== actor);
+  else if (state.phase === 'battle' && state.turn && state.turn !== actor && humans.includes(state.turn)) targets = [state.turn];
+  for (const slot of targets) {
+    const player = room.players[slot];
+    if (!player.push || !player.push.length) continue;
+    if (now - (player.seenAt || 0) < SEEN_WINDOW_MS) continue;
+    let body;
+    if (state.phase === 'over') {
+      const winner = state.winner;
+      body = winner === slot ? 'You won!'
+        : room.players[winner] ? `${room.players[winner].name} won.`
+        : 'It ended in a draw.';
+      body = `Game over. ${body}`;
+    } else {
+      body = `${actorName} ${verb}. Your turn.`;
+    }
+    const message = { title, body, tag: room.code, url: `./?play=${room.code}` };
+    push.sendToSeat(pushKeys, player, message, { contact: PUSH_CONTACT }).then(dropped => { if (dropped) save(); });
+  }
+}
+
 function cleanName(value, fallback) {
   const name = String(value || '').trim().slice(0, 32);
   return name || fallback;
@@ -253,6 +290,7 @@ function handleApi(req, res, body) {
     room.players[slot] = { token: tok, name: cleanName(body.name, `Player ${joined.length + 1}`) };
     notifyJoin(room, slot);
     room.updatedAt = Date.now();
+    turnAlerts(room, slot, 'joined');
     save();
     return send(res, 200, { room: room.code, token: tok, you: slot, game: room.game });
   }
@@ -266,6 +304,7 @@ function handleApi(req, res, body) {
     if (err) return send(res, 400, { error: err });
     room.updatedAt = Date.now();
     scheduleBot(room);
+    turnAlerts(room, who, 'is ready');
     save();
     return send(res, 200, { ok: true });
   }
@@ -279,6 +318,7 @@ function handleApi(req, res, body) {
     if (err) return send(res, 400, { error: err });
     room.updatedAt = Date.now();
     scheduleBot(room);
+    turnAlerts(room, who, 'moved');
     save();
     return send(res, 200, { ok: true });
   }
@@ -288,6 +328,7 @@ function handleApi(req, res, body) {
     if (!room) return send(res, 404, { error: 'No such game.' });
     const who = playerOf(room, requestToken(req, body));
     if (!who) return send(res, 403, { error: 'Not in this game.' });
+    if (url.searchParams.get('seen') === '1') room.players[who].seenAt = Date.now();
     advanceBotIfReady(room);
     const opp = roomPlayers(room).filter(slot => slot !== who).map(slot => room.players[slot]);
     return send(res, 200, {
@@ -303,6 +344,27 @@ function handleApi(req, res, body) {
       updatedAt: Number(room.updatedAt || room.createdAt) || null,
       view: games[room.game].viewFor(room.state, who, publicPlayers(room)),
     });
+  }
+
+  if (route === '/api/push/key' && req.method === 'GET') {
+    return send(res, 200, { publicKey: pushKeys.publicKey });
+  }
+
+  if ((route === '/api/push/subscribe' || route === '/api/push/unsubscribe') && req.method === 'POST') {
+    const room = db.rooms[cleanRoomCode(body.room)];
+    if (!room) return send(res, 404, { error: 'No such game.' });
+    const who = playerOf(room, requestToken(req, body));
+    if (!who) return send(res, 403, { error: 'Not in this game.' });
+    const player = room.players[who];
+    if (route === '/api/push/subscribe') {
+      const subscription = push.cleanSubscription(body.subscription, PUSH_TEST_ORIGIN);
+      if (!subscription) return send(res, 400, { error: 'That is not a browser push subscription.' });
+      push.addSubscription(player, subscription);
+    } else {
+      push.removeSubscription(player, String(body.endpoint || ''));
+    }
+    save();
+    return send(res, 200, { ok: true });
   }
 
   return send(res, 404, { error: 'Unknown endpoint.' });
@@ -391,6 +453,7 @@ server.on('error', (err) => {
   throw err;
 });
 
+if (!hadPushKeys) save(); // keep the new turn-alert keys even if no game changes
 server.listen(PORT, HOST, () => {
   const address = server.address();
   const actualPort = address && typeof address === 'object' ? address.port : PORT;

@@ -4,6 +4,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 
 const root = path.resolve(__dirname, '..');
 const dataFile = path.join(os.tmpdir(), `turn-based-games-smoke-${process.pid}.json`);
@@ -65,10 +66,11 @@ function waitForExit(child) {
   return new Promise(resolve => child.once('exit', resolve));
 }
 
+let pushOrigin = '';
 function spawnServer() {
   return spawn(process.execPath, ['server.js'], {
     cwd: root,
-    env: { ...process.env, HOST: '', PORT: '0', DATA_FILE: dataFile, BOT_MOVE_DELAY_MS: '1' },
+    env: { ...process.env, HOST: '', PORT: '0', DATA_FILE: dataFile, BOT_MOVE_DELAY_MS: '1', PUSH_TEST_ORIGIN: pushOrigin },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
@@ -174,6 +176,135 @@ function testBotLevelsPlayLegalGames() {
   }
 }
 
+// RFC 8291 Appendix A: the encrypted body must match byte for byte.
+function testPushEncryptionVector() {
+  const push = require('../server/push');
+  const serverEcdh = crypto.createECDH('prime256v1');
+  serverEcdh.setPrivateKey(Buffer.from('yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw', 'base64url'));
+  const body = push.encrypt('When I grow up, I want to be a watermelon', {
+    keys: { p256dh: 'BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4', auth: 'BTBZMqHH6r4Tts7J_aSIgg' },
+  }, { salt: Buffer.from('DGv6ra1nlYgDCS1FRnbzlw', 'base64url'), serverEcdh });
+  assert.strictEqual(body.toString('base64url'),
+    'DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN');
+  assert.strictEqual(push.cleanSubscription({ endpoint: 'https://evil.example/x', keys: {} }), null);
+}
+
+// A stand-in push service: records each POST; `status` is what it answers.
+function startFakePush() {
+  const received = [];
+  const fake = { received, status: 201 };
+  fake.server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', c => chunks.push(c));
+    req.on('end', () => {
+      received.push({ path: req.url, headers: req.headers, body: Buffer.concat(chunks) });
+      res.writeHead(fake.status);
+      res.end();
+    });
+  });
+  return new Promise(resolve => fake.server.listen(0, '127.0.0.1', () => resolve(fake)));
+}
+
+// What the browser does with a push: decrypt the aes128gcm body.
+function decryptPush(body, uaEcdh, authSecret) {
+  const salt = body.subarray(0, 16);
+  const idLen = body.readUInt8(20);
+  const asPublic = body.subarray(21, 21 + idLen);
+  const shared = uaEcdh.computeSecret(asPublic);
+  const keyInfo = Buffer.concat([Buffer.from('WebPush: info\0'), uaEcdh.getPublicKey(), asPublic]);
+  const ikm = Buffer.from(crypto.hkdfSync('sha256', shared, authSecret, keyInfo, 32));
+  const cek = Buffer.from(crypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16));
+  const nonce = Buffer.from(crypto.hkdfSync('sha256', ikm, salt, Buffer.from('Content-Encoding: nonce\0'), 12));
+  const data = body.subarray(21 + idLen);
+  const decipher = crypto.createDecipheriv('aes-128-gcm', cek, nonce);
+  decipher.setAuthTag(data.subarray(data.length - 16));
+  const plain = Buffer.concat([decipher.update(data.subarray(0, data.length - 16)), decipher.final()]);
+  assert.strictEqual(plain[plain.length - 1], 2);
+  return JSON.parse(plain.subarray(0, plain.length - 1).toString('utf8'));
+}
+
+function verifyVapid(headers, publicKey, origin) {
+  const match = String(headers.authorization).match(/^vapid t=([^.]+)\.([^.]+)\.([^,]+), k=(.+)$/);
+  assert.ok(match, 'vapid authorization header');
+  assert.strictEqual(match[4], publicKey);
+  const raw = Buffer.from(publicKey, 'base64url');
+  const key = crypto.createPublicKey({ format: 'jwk', key: { kty: 'EC', crv: 'P-256', x: raw.subarray(1, 33).toString('base64url'), y: raw.subarray(33).toString('base64url') } });
+  assert.ok(crypto.verify('sha256', Buffer.from(`${match[1]}.${match[2]}`), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(match[3], 'base64url')));
+  const claims = JSON.parse(Buffer.from(match[2], 'base64url').toString('utf8'));
+  assert.strictEqual(claims.aud, origin);
+  assert.ok(claims.exp > Date.now() / 1000 && /^(mailto:|https:)/.test(claims.sub));
+  assert.strictEqual(headers['content-encoding'], 'aes128gcm');
+  assert.ok(Number(headers.ttl) > 0);
+}
+
+async function waitFor(check, ms = 2000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { if (check()) return true; await delay(25); }
+  return check();
+}
+
+async function testTurnAlerts(port, fake) {
+  const key = await request(port, 'GET', '/api/push/key', null);
+  assert.strictEqual(key.status, 200);
+  assert.strictEqual(Buffer.from(key.data.publicKey, 'base64url').length, 65);
+
+  const host = await request(port, 'POST', '/api/create', { game: 'connectfour', name: 'John' });
+  const sis = await request(port, 'POST', '/api/join', { room: host.data.room, name: 'Sis' });
+  const room = host.data.room;
+  const as = who => ({ Authorization: `Bearer ${who.data.token}` });
+  const move = (who, c) => request(port, 'POST', '/api/move', { room, move: { c } }, as(who));
+
+  const uaEcdh = crypto.createECDH('prime256v1');
+  uaEcdh.generateKeys();
+  const authSecret = crypto.randomBytes(16);
+  const subscription = { endpoint: `${pushOrigin}/push/sis`, keys: { p256dh: uaEcdh.getPublicKey().toString('base64url'), auth: authSecret.toString('base64url') } };
+  const subscribe = sub => request(port, 'POST', '/api/push/subscribe', { room, subscription: sub }, as(sis));
+
+  assert.strictEqual((await subscribe({ ...subscription, endpoint: 'https://evil.example/x' })).status, 400);
+  assert.strictEqual((await subscribe({ ...subscription, endpoint: 'https://web.push.apple.com:8443/x' })).status, 400);
+  assert.strictEqual((await request(port, 'POST', '/api/push/subscribe', { room, subscription }, {})).status, 403);
+  assert.strictEqual((await subscribe(subscription)).status, 200);
+  const stored = await request(port, 'GET', `/api/state?room=${room}`, null, as(sis));
+  assert.doesNotMatch(stored.raw, /push\/sis/, 'subscriptions never leave the server');
+
+  // John moves while Sis is away: she gets one encrypted, signed alert.
+  assert.strictEqual((await move(host, 0)).status, 200);
+  assert.ok(await waitFor(() => fake.received.length === 1), 'alert delivered');
+  const alert = fake.received[0];
+  assert.strictEqual(alert.path, '/push/sis');
+  verifyVapid(alert.headers, key.data.publicKey, pushOrigin);
+  assert.deepStrictEqual(decryptPush(alert.body, uaEcdh, authSecret), {
+    title: 'Connect Four', body: 'John moved. Your turn.', tag: room, url: `./?play=${room}`,
+  });
+
+  // Her own move alerts nobody (John has no alerts on).
+  assert.strictEqual((await move(sis, 1)).status, 200);
+  await delay(200);
+  assert.strictEqual(fake.received.length, 1);
+
+  // A browser that dropped the subscription answers 410: the server forgets it.
+  fake.status = 410;
+  assert.strictEqual((await move(host, 0)).status, 200);
+  assert.ok(await waitFor(() => fake.received.length === 2));
+  await delay(400);
+  const afterGone = JSON.parse(fs.readFileSync(dataFile, 'utf8')).rooms[room].players.B;
+  assert.strictEqual(afterGone.push, undefined);
+  fake.status = 201;
+
+  // With her game screen open (seen=1 polls), she gets no alert.
+  assert.strictEqual((await subscribe(subscription)).status, 200);
+  await request(port, 'GET', `/api/state?room=${room}&seen=1`, null, as(sis));
+  assert.strictEqual((await move(sis, 1)).status, 200);
+  assert.strictEqual((await move(host, 0)).status, 200);
+  await delay(300);
+  assert.strictEqual(fake.received.length, 2);
+
+  // Turning alerts off removes the device.
+  assert.strictEqual((await request(port, 'POST', '/api/push/unsubscribe', { room, endpoint: subscription.endpoint }, as(sis))).status, 200);
+  await delay(400);
+  assert.strictEqual(JSON.parse(fs.readFileSync(dataFile, 'utf8')).rooms[room].players.B.push, undefined);
+}
+
 function fleet() {
   return [
     { name: 'Carrier', cells: ['0,0', '0,1', '0,2', '0,3', '0,4'] },
@@ -190,6 +321,9 @@ async function main() {
   testDotsBoxesScoring();
   testBattleshipCanonicalCells();
   testBotLevelsPlayLegalGames();
+  testPushEncryptionVector();
+  const fakePush = await startFakePush();
+  pushOrigin = `http://127.0.0.1:${fakePush.server.address().port}`;
   try { fs.unlinkSync(dataFile); } catch {}
   fs.writeFileSync(dataFile, JSON.stringify({
     rooms: {
@@ -210,6 +344,8 @@ async function main() {
 
     const traversal = await request(port, 'GET', '/..%2Fpackage.json', null);
     assert.strictEqual(traversal.status, 403);
+
+    await testTurnAlerts(port, fakePush);
 
     const unknownGame = await request(port, 'POST', '/api/create', { game: 'not-a-game' });
     assert.strictEqual(unknownGame.status, 400);
@@ -460,6 +596,7 @@ async function main() {
     assert.strictEqual(resumedBot.data.opponentName, 'Botty');
     assert.deepStrictEqual(resumedBot.data.view.board, expectedBoard);
   } finally {
+    fakePush.server.close();
     child.kill();
     try { fs.unlinkSync(dataFile); } catch {}
     try { fs.unlinkSync(`${dataFile}.tmp`); } catch {}

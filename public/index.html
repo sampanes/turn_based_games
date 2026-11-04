@@ -101,6 +101,7 @@
   .saved-game.yours .saved-turn { color: var(--sonar); }
   .saved-game.theirs .saved-turn { color: var(--amber); }
   .saved-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .alerts-text { color: var(--mute); font-size: 13px; line-height: 1.45; margin: 4px 0 8px; }
   .resume-card .saved-name { color: var(--ink); font-size: 15px; font-weight: 600; }
   .resume-card .saved-meta { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .saved-game button { flex: 0 0 auto; width: auto; padding-inline: 16px; }
@@ -1184,6 +1185,11 @@
     <div id="savedGames" class="resume-card hidden">
       <strong>Your games</strong>
       <div id="savedList" class="saved-list"></div>
+    </div>
+    <div id="alertsCard" class="resume-card alerts-card hidden">
+      <strong>Turn alerts</strong>
+      <p id="alertsText" class="alerts-text"></p>
+      <button id="alertsBtn" class="hidden" style="width:100%" onclick="toggleAlerts()">Turn on</button>
     </div>
     <h2>New engagement</h2>
     <label for="gameSelect">Game</label>

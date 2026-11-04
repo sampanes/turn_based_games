@@ -141,6 +141,7 @@ function launchParams() {
     mode: params.get('mode'),
     game: params.get('game'),
     room: params.get('room'),
+    play: params.get('play'),
   };
 }
 function applyLaunchGame(gameId) {
@@ -155,6 +156,7 @@ function clearLaunchParams() {
   url.searchParams.delete('mode');
   url.searchParams.delete('game');
   url.searchParams.delete('room');
+  url.searchParams.delete('play');
   window.history.replaceState({}, '', url.pathname + url.search + url.hash);
 }
 
@@ -260,6 +262,139 @@ function timeAgo(ms) {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
+// ------------------------------------------------------------ turn alerts
+// Web Push through the server. The server only sends to games with a person
+// in them, and not while that player's game screen is open. On iPhone this
+// works only in the home-screen app, which keeps its own saved games.
+let pushKey = null; // the server's VAPID key; stays null without a server (GitHub Pages)
+const alertsRegistered = new Set();
+let alertsOn = false; // last known: does this device have a push subscription
+
+function isIos() { return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function isStandalone() { return navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; }
+function pushSupported() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function keyBytes(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64url.length + 3) % 4);
+  return Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+}
+function alertableGames() { return loadSavedGames().filter(e => e.mode === 'online' && !e.bot && !e.over); }
+
+async function alertsSubscription() {
+  if (!pushKey || !pushSupported()) return null;
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+
+async function seatAlerts(entry, path, body) {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${entry.token}` },
+      body: JSON.stringify({ room: entry.room, ...body }),
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+// Tell the server this device wants alerts for one game (once per page load).
+async function registerAlertsFor(entry, sub) {
+  if (!entry || entry.mode !== 'online' || entry.bot || alertsRegistered.has(entry.room)) return;
+  sub = sub || await alertsSubscription();
+  if (!sub) return;
+  if (await seatAlerts(entry, '/api/push/subscribe', { subscription: sub.toJSON() })) alertsRegistered.add(entry.room);
+}
+
+async function updateAlertsCard() {
+  const card = $('alertsCard');
+  if (!card) return;
+  if (!pushKey) { card.classList.add('hidden'); return; }
+  const text = $('alertsText');
+  const btn = $('alertsBtn');
+  let message, label = null;
+  if (isIos() && !isStandalone()) {
+    message = 'On iPhone, alerts work only in the home-screen app: tap Share, then Add to Home Screen, and open the game from that icon. The icon keeps its own list of games, so start or join games from there.';
+  } else if (!pushSupported()) {
+    message = 'This browser cannot show turn alerts.';
+  } else if (Notification.permission === 'denied') {
+    message = 'Alerts are blocked for this site. Allow notifications for it in the device settings, then come back.';
+  } else if ((alertsOn = !!(await alertsSubscription()))) {
+    message = 'On for this device. You get an alert when it is your turn in a game with a person, unless that game is already open.';
+    label = 'Turn off';
+  } else {
+    message = 'Get an alert on this device when it is your turn in a game with a person.';
+    label = 'Turn on alerts';
+  }
+  card.classList.remove('hidden');
+  text.textContent = message;
+  btn.classList.toggle('hidden', !label);
+  if (label) btn.textContent = label;
+}
+
+async function toggleAlerts() {
+  const btn = $('alertsBtn');
+  // Ask before any await, while the tap still counts as a user gesture (iPhone requires it).
+  const asking = alertsOn ? null : Notification.requestPermission();
+  btn.disabled = true;
+  try {
+    const existing = await alertsSubscription();
+    if (existing) {
+      await Promise.all(alertableGames().map(e => seatAlerts(e, '/api/push/unsubscribe', { endpoint: existing.endpoint })));
+      await existing.unsubscribe();
+      alertsRegistered.clear();
+      toast('Turn alerts are off on this device.');
+      return;
+    }
+    const permission = await (asking || Notification.requestPermission());
+    if (permission !== 'granted') { toast('Alerts were not allowed.'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushKey) });
+    alertsRegistered.clear();
+    await Promise.all(alertableGames().map(e => registerAlertsFor(e, sub)));
+    toast('Turn alerts are on.');
+  } catch (e) {
+    console.error(e);
+    toast('Could not turn on alerts: ' + (e.message || e));
+  } finally {
+    btn.disabled = false;
+    updateAlertsCard();
+  }
+}
+
+async function initAlerts() {
+  try {
+    const res = await fetch('/api/push/key', { cache: 'no-store' });
+    if (!res.ok) return;
+    pushKey = (await res.json()).publicKey || null;
+  } catch { return; }
+  if (pushKey && pushSupported()) {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js');
+      // A server that made new keys (data.json was reset) needs a fresh subscription.
+      const sub = await reg.pushManager.getSubscription();
+      const key = sub && sub.options && sub.options.applicationServerKey;
+      if (sub && key && btoa(String.fromCharCode(...new Uint8Array(key))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') !== pushKey) {
+        await sub.unsubscribe();
+      } else if (sub) {
+        alertableGames().forEach(e => registerAlertsFor(e, sub));
+      }
+    } catch (e) { console.error(e); }
+  }
+  if (!$('home').classList.contains('hidden')) updateAlertsCard();
+}
+
+// A tapped alert opens its game, in this window if the app is already open.
+function openGameFromAlert(room) {
+  const entry = room && loadSavedGames().find(e => e.room === String(room).toUpperCase());
+  if (entry) resumeSavedGame(entry);
+  else toast('That game is not saved on this device.');
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (!event.data || event.data.type !== 'open-game') return;
+    try { openGameFromAlert(new URL(event.data.url).searchParams.get('play')); } catch {}
+  });
+}
+
 // Live turn status for online saved games, keyed by room:
 // { state: 'you' | 'them' | 'waiting' | 'over', at: last activity in ms }.
 const savedStatus = new Map();
@@ -324,6 +459,7 @@ function savedEntryStatus(entry) {
 function updateResumeCard() {
   renderSavedList();
   startSavedStatusPoll();
+  updateAlertsCard();
 }
 
 function renderSavedList() {
@@ -461,7 +597,7 @@ async function copyInvite() {
   }
 }
 
-function enterRoom() { startPoll(); poll(); }
+function enterRoom() { startPoll(); poll(); registerAlertsFor(session); }
 
 // Sends one move, then waits for the fresh view before accepting another tap,
 // so a double tap cannot post twice off a stale view.
@@ -524,10 +660,16 @@ function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null;
 
 async function poll() {
   if (!session) return;
+  const asked = session;
+  const stillHere = () => session && session.room === asked.room && session.token === asked.token;
   try {
-    const d = await api(`/api/state?room=${encodeURIComponent(session.room)}`, 'GET');
+    const seen = document.visibilityState === 'visible' ? '&seen=1' : '';
+    const d = await api(`/api/state?room=${encodeURIComponent(asked.room)}${seen}`, 'GET');
+    // The player may have gone Home or opened another game while this was in flight.
+    if (!stillHere()) return;
     render(d);
   } catch (e) {
+    if (!stillHere()) return;
     if (/No such game|Not in this game/.test(e.message)) {
       clearSession(); stopPoll(); show('home'); updateResumeCard();
       toast('That game has ended.');
@@ -3177,4 +3319,6 @@ if (session && launchGame) {
 } else {
   show('home');
   clearLaunchParams();
+  if (params.play) openGameFromAlert(params.play);
 }
+initAlerts();
