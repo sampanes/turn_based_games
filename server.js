@@ -300,6 +300,7 @@ function handleApi(req, res, body) {
       minPlayers: minPlayers(room.game),
       maxPlayers: maxPlayers(room.game),
       botLevel: room.botRoom ? cleanLevel(room.botLevel) : null,
+      updatedAt: Number(room.updatedAt || room.createdAt) || null,
       view: games[room.game].viewFor(room.state, who, publicPlayers(room)),
     });
   }

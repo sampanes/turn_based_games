@@ -95,6 +95,11 @@
   .saved-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
   .saved-game { display: flex; align-items: center; gap: 8px; }
   .saved-game.over { opacity: .7; }
+  .saved-game.yours { border-left: 3px solid var(--sonar); padding-left: 9px; background: linear-gradient(90deg, rgba(52,231,196,.12), rgba(52,231,196,0) 70%); border-radius: 6px; }
+  .saved-game.theirs { opacity: .8; }
+  .saved-turn { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+  .saved-game.yours .saved-turn { color: var(--sonar); }
+  .saved-game.theirs .saved-turn { color: var(--amber); }
   .saved-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .resume-card .saved-name { color: var(--ink); font-size: 15px; font-weight: 600; }
   .resume-card .saved-meta { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -110,7 +110,10 @@ function show(id) {
     if (el) el.classList.toggle('hidden', section !== id);
   });
   if (id === 'home') updateResumeCard();
-  else if ($('inviteNotice')) $('inviteNotice').classList.add('hidden');
+  else {
+    stopSavedStatusPoll();
+    if ($('inviteNotice')) $('inviteNotice').classList.add('hidden');
+  }
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -257,34 +260,106 @@ function timeAgo(ms) {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 }
 
+// Live turn status for online saved games, keyed by room:
+// { state: 'you' | 'them' | 'waiting' | 'over', at: last activity in ms }.
+const savedStatus = new Map();
+const SAVED_STATUS_POLL_MS = 5000;
+let savedStatusTimer = null;
+
+function savedTurnState(d) {
+  const v = d.view || {};
+  if (v.phase === 'over') return 'over';
+  if (!d.opponentJoined || v.phase === 'lobby') return 'waiting';
+  if (v.phase === 'placing') return v.youPlaced ? 'them' : 'you';
+  return v.turn === d.you ? 'you' : 'them';
+}
+
+async function refreshSavedStatus() {
+  const online = loadSavedGames().filter(e => e.mode === 'online' && !e.over);
+  if (!online.length || document.hidden) return;
+  let changed = false;
+  await Promise.all(online.map(async entry => {
+    try {
+      const res = await fetch(`/api/state?room=${encodeURIComponent(entry.room)}`, {
+        headers: { Authorization: `Bearer ${entry.token}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const d = await res.json();
+      const next = { state: savedTurnState(d), at: Number(d.updatedAt) || 0 };
+      const prev = savedStatus.get(entry.room);
+      if (!prev || prev.state !== next.state || prev.at !== next.at) {
+        savedStatus.set(entry.room, next);
+        changed = true;
+      }
+    } catch {} // offline or room expired: keep the last known status
+  }));
+  if (changed && !$('home').classList.contains('hidden')) renderSavedList();
+}
+
+function startSavedStatusPoll() {
+  stopSavedStatusPoll();
+  refreshSavedStatus();
+  savedStatusTimer = setInterval(refreshSavedStatus, SAVED_STATUS_POLL_MS);
+}
+function stopSavedStatusPoll() {
+  if (savedStatusTimer) clearInterval(savedStatusTimer);
+  savedStatusTimer = null;
+}
+
+// Sort key: your turn, their turn, waiting for a player, vs computer, finished.
+// Within a group the game that has waited longest comes first.
+const SAVED_RANK = { you: 0, them: 1, waiting: 2, computer: 3, over: 4 };
+function savedEntryStatus(entry) {
+  if (entry.over) return { state: 'over', at: entry.savedAt || 0 };
+  if (entry.mode === 'computer') return { state: 'computer', at: entry.savedAt || 0 };
+  const live = savedStatus.get(entry.room);
+  if (live) return { state: live.state, at: live.at || entry.savedAt || 0 };
+  return { state: entry.opponent || entry.bot ? 'them' : 'waiting', at: entry.savedAt || 0, unknown: true };
+}
+
 // Home screen list of every saved game (kept under its old name: show('home') calls it).
 function updateResumeCard() {
+  renderSavedList();
+  startSavedStatusPoll();
+}
+
+function renderSavedList() {
   const wrap = $('savedGames');
   const list = $('savedList');
   if (!wrap || !list) return;
-  const games = loadSavedGames();
+  const games = loadSavedGames().map(entry => ({ entry, status: savedEntryStatus(entry) }));
+  games.sort((a, b) => (SAVED_RANK[a.status.state] - SAVED_RANK[b.status.state]) || (a.status.at - b.status.at));
   wrap.classList.toggle('hidden', !games.length);
   list.innerHTML = '';
-  games.forEach(entry => {
+  games.forEach(({ entry, status }) => {
     const meta = gameMeta(entry.game);
     const skill = BOT_LEVEL_NAMES[entry.level] ? ` (${BOT_LEVEL_NAMES[entry.level].toLowerCase()})` : '';
     const who = entry.mode === 'computer' ? 'vs computer' + skill
       : entry.bot ? 'vs Botty' + skill
       : entry.opponent ? `vs ${entry.opponent}` : `room ${entry.room}, waiting`;
+    const yours = status.state === 'you' && !status.unknown;
+    const theirs = status.state === 'them' && !status.unknown;
     const row = document.createElement('div');
-    row.className = 'saved-game' + (entry.over ? ' over' : '');
+    row.className = 'saved-game' + (entry.over ? ' over' : '') + (yours ? ' yours' : '') + (theirs ? ' theirs' : '');
     const info = document.createElement('div');
     info.className = 'saved-info';
+    if (yours || theirs) {
+      const turn = document.createElement('span');
+      turn.className = 'saved-turn';
+      turn.textContent = yours ? 'Your turn' : 'Their turn';
+      info.append(turn);
+    }
     const name = document.createElement('span');
     name.className = 'saved-name';
     name.textContent = (meta && meta.name) || entry.game || 'Game';
     const sub = document.createElement('span');
     sub.className = 'saved-meta';
-    sub.textContent = [who, entry.over ? 'finished' : null, timeAgo(entry.savedAt || Date.now())].filter(Boolean).join(' - ');
+    sub.textContent = [who, entry.over ? 'finished' : null, timeAgo(status.at || Date.now())].filter(Boolean).join(' - ');
     info.append(name, sub);
     const resume = document.createElement('button');
-    resume.className = entry.over ? 'ghost' : 'primary';
-    resume.textContent = entry.over ? 'View' : 'Resume';
+    resume.className = entry.over || theirs ? 'ghost' : 'primary';
+    resume.textContent = entry.over ? 'View' : yours ? 'Play' : 'Resume';
     resume.onclick = () => resumeSavedGame(entry);
     const drop = document.createElement('button');
     drop.className = 'ghost saved-drop';
