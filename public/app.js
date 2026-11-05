@@ -105,15 +105,12 @@ function show(id) {
   document.body.classList.toggle('mancala-mode', id === 'mancala');
   document.body.classList.toggle('uno-mode', id === 'oneCard');
   updateFxButton();
-  ['home','lobby','placement','battle','connectFour','dotsBoxes','oneCard','mancala','ultimateTTT'].forEach(section => {
+  ['home','invite','settings','lobby','placement','battle','connectFour','dotsBoxes','oneCard','mancala','ultimateTTT'].forEach(section => {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
   });
-  if (id === 'home') updateResumeCard();
-  else {
-    stopSavedStatusPoll();
-    if ($('inviteNotice')) $('inviteNotice').classList.add('hidden');
-  }
+  if (id === 'home') { updateNameRow(); updateResumeCard(); }
+  else stopSavedStatusPoll();
 }
 function toast(msg) {
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -192,9 +189,111 @@ async function api(path, method, body) {
   return data;
 }
 
+// ------------------------------------------------------------ name, server, settings
+const NAME_KEY = 'turnBasedGamesName';
+function savedPlayerName() { try { return (localStorage.getItem(NAME_KEY) || '').trim(); } catch { return ''; } }
+function savePlayerName(value) {
+  const name = String(value || '').trim().slice(0, 16);
+  try { if (name) localStorage.setItem(NAME_KEY, name); else localStorage.removeItem(NAME_KEY); } catch {}
+}
+// The home screen asks for a name only until one is saved; after that it lives in Settings.
+function updateNameRow() {
+  const name = savedPlayerName();
+  $('nameRow').classList.toggle('hidden', !!name);
+  $('homeHello').textContent = name ? `Hi, ${name}` : 'Welcome';
+}
+function playerName(fallback) {
+  const typed = !$('nameRow').classList.contains('hidden') && $('nameFirst').value.trim();
+  if (typed) { savePlayerName(typed); updateNameRow(); }
+  return savedPlayerName() || fallback;
+}
+
+// GitHub Pages has no server: hide friend games and play the computer offline.
+let hasServer = !/\.github\.io$/i.test(window.location.hostname);
+function applyServerMode() { document.body.classList.toggle('no-server', !hasServer); }
+
+function openSettings() {
+  $('playerName').value = savedPlayerName();
+  $('moveCodeOut').classList.add('hidden');
+  $('moveCodeIn').value = '';
+  show('settings');
+  updateAlertsCard();
+}
+function closeSettings() {
+  savePlayerName($('playerName').value);
+  saveBotLevel();
+  show('home');
+}
+
+// One button for the computer: Botty (saved on the server) when there is one.
+function playComputer() { return hasServer ? createBottyGame() : createComputerGame(); }
+
+// ---- moving games between browsers (Discord's browser, Safari, the home-screen app)
+const MOVE_PREFIX = 'TBG1.';
+function moveCode() {
+  const games = loadSavedGames().filter(e => e.mode === 'online' && !e.over)
+    .map(e => ({ r: e.room, t: e.token, y: e.you, g: e.game, b: e.bot ? 1 : 0, l: e.level || undefined, o: e.opponent || undefined }));
+  if (!games.length) return null;
+  const bytes = new TextEncoder().encode(JSON.stringify(games));
+  return MOVE_PREFIX + btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function copyMoveCode() {
+  const code = moveCode();
+  if (!code) return toast('No unfinished games with a friend or Botty to move.');
+  const out = $('moveCodeOut');
+  out.value = code;
+  out.classList.remove('hidden');
+  try {
+    await navigator.clipboard.writeText(code);
+    toast('Copied. Paste it in Settings in the other browser.');
+  } catch {
+    out.focus();
+    out.select();
+    toast('Select the code and copy it.');
+  }
+}
+async function importMoveCode() {
+  const text = $('moveCodeIn').value.replace(/\s+/g, '');
+  let games = null;
+  try {
+    if (!text.startsWith(MOVE_PREFIX)) throw new Error('prefix');
+    const b64 = text.slice(MOVE_PREFIX.length).replace(/-/g, '+').replace(/_/g, '/');
+    games = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b64 + '==='.slice((b64.length + 3) % 4)), ch => ch.charCodeAt(0))));
+  } catch { return toast('That is not a games code. Copy it again from the other browser.'); }
+  if (!Array.isArray(games)) return toast('That is not a games code.');
+  let added = 0, gone = 0;
+  for (const g of games.slice(0, 12)) {
+    if (!g || !/^[A-Z0-9]{4}$/.test(g.r) || !/^[a-f0-9]{32}$/i.test(g.t)) continue;
+    try {
+      const res = await fetch(`/api/state?room=${encodeURIComponent(g.r)}`, { headers: { Authorization: `Bearer ${g.t}` }, cache: 'no-store' });
+      if (!res.ok) { gone++; continue; }
+      const d = await res.json();
+      rememberGame({ room: g.r, token: g.t, you: d.you || g.y, game: d.game || g.g, mode: 'online',
+        ...(g.b ? { bot: true } : {}), ...(g.l ? { level: g.l } : {}), opponent: d.opponentName || g.o || '', over: d.view && d.view.phase === 'over' });
+      added++;
+    } catch { gone++; }
+  }
+  $('moveCodeIn').value = '';
+  if (added) registerAllAlerts();
+  toast(added ? `Added ${added} game${added === 1 ? '' : 's'}.${gone ? ` ${gone} had ended.` : ''}` : 'None of those games are still going.');
+}
+
+// ---- invitation links
+function openInvite(code) {
+  $('inviteCode').textContent = code;
+  $('inviteName').value = savedPlayerName();
+  show('invite');
+}
+async function joinInvite() {
+  const name = $('inviteName').value.trim();
+  if (name) savePlayerName(name);
+  $('joinCode').value = $('inviteCode').textContent;
+  await joinGame();
+}
+
 async function createGame() {
   try {
-    const name = $('name1').value.trim() || 'Player 1';
+    const name = playerName('Player 1');
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online' });
     enterRoom();
@@ -216,7 +315,7 @@ async function createBottyGame() {
   try {
     const meta = currentGameMeta();
     if (meta && meta.supportsComputer === false) return toast('Botty does not support that game yet.');
-    const name = $('name1').value.trim() || 'Player 1';
+    const name = playerName('Player 1');
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name, bot: true, level: botLevel() });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online', bot: true, level: d.level || botLevel() });
     enterRoom();
@@ -224,7 +323,7 @@ async function createBottyGame() {
 }
 async function createComputerGame() {
   try {
-    const name = $('name1').value.trim() || 'Player 1';
+    const name = playerName('Player 1');
     session = { mode: 'computer' };
     const d = await api('/api/create', 'POST', { game: selectedGameId(), name, level: botLevel() });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'computer', level: d.level });
@@ -235,7 +334,7 @@ async function joinGame() {
   try {
     const room = $('joinCode').value.trim().toUpperCase();
     if (room.length !== 4) return toast('Codes are 4 letters/numbers.');
-    const name = $('name2').value.trim() || 'Player 2';
+    const name = playerName('Player 2');
     const d = await api('/api/join', 'POST', { room, name });
     setSession({ room: d.room, token: d.token, you: d.you, game: d.game, mode: 'online' });
     enterRoom();
@@ -307,12 +406,12 @@ async function registerAlertsFor(entry, sub) {
 async function updateAlertsCard() {
   const card = $('alertsCard');
   if (!card) return;
-  if (!pushKey) { card.classList.add('hidden'); return; }
+  if (!pushKey) { card.classList.add('hidden'); $('gearDot').classList.add('hidden'); return; }
   const text = $('alertsText');
   const btn = $('alertsBtn');
   let message, label = null;
   if (isIos() && !isStandalone()) {
-    message = 'On iPhone, alerts work only in the home-screen app: tap Share, then Add to Home Screen, and open the game from that icon. The icon keeps its own list of games, so start or join games from there.';
+    message = 'On iPhone, alerts work only in the home-screen app. In Discord or another app? Open this page in Safari first, from that app\'s menu. Then tap Share, Add to Home Screen, open the game from the new icon, and turn alerts on there. The icon keeps its own games; bring them over with Move games below.';
   } else if (!pushSupported()) {
     message = 'This browser cannot show turn alerts.';
   } else if (Notification.permission === 'denied') {
@@ -328,6 +427,11 @@ async function updateAlertsCard() {
   text.textContent = message;
   btn.classList.toggle('hidden', !label);
   if (label) btn.textContent = label;
+  const helps = !alertsOn && alertableGames().length > 0 && (label || (isIos() && !isStandalone()));
+  $('gearDot').classList.toggle('hidden', !helps);
+}
+function registerAllAlerts() {
+  alertsSubscription().then(sub => { if (sub) alertableGames().forEach(e => registerAlertsFor(e, sub)); }).catch(() => {});
 }
 
 async function toggleAlerts() {
@@ -363,9 +467,9 @@ async function toggleAlerts() {
 async function initAlerts() {
   try {
     const res = await fetch('/api/push/key', { cache: 'no-store' });
-    if (!res.ok) return;
+    if (!res.ok) { hasServer = false; applyServerMode(); return; }
     pushKey = (await res.json()).publicKey || null;
-  } catch { return; }
+  } catch { hasServer = false; applyServerMode(); return; }
   if (pushKey && pushSupported()) {
     try {
       const reg = await navigator.serviceWorker.register('sw.js');
@@ -379,7 +483,7 @@ async function initAlerts() {
       }
     } catch (e) { console.error(e); }
   }
-  if (!$('home').classList.contains('hidden')) updateAlertsCard();
+  updateAlertsCard();
 }
 
 // A tapped alert opens its game, in this window if the app is already open.
@@ -632,7 +736,7 @@ async function restartComputerGame() {
   if (midGame && !confirm('Start a new game? This one will be lost.')) return;
   const game = session.game || selectedGameId();
   const level = session.level || botLevel();
-  const name = ($('name1') && $('name1').value.trim()) || 'Player 1';
+  const name = savedPlayerName() || 'Player 1';
   try {
     clearSession();
     resetGameUi();
@@ -3290,12 +3394,10 @@ document.addEventListener('keydown', e => {
 
 populateGameSelect();
 loadBotLevel();
+applyServerMode();
 const params = launchParams();
 applyLaunchGame(params.game);
-if (params.room && /^[A-Z0-9]{4}$/i.test(params.room)) {
-  $('joinCode').value = params.room.toUpperCase();
-  $('inviteNotice').classList.remove('hidden');
-}
+const inviteRoom = params.room && /^[A-Z0-9]{4}$/i.test(params.room) ? params.room.toUpperCase() : null;
 session = loadSession();
 if (session && session.room) rememberGame(session, false); // carry over a pre-list single save
 pruneSoloRooms();
@@ -3320,5 +3422,6 @@ if (session && launchGame) {
   show('home');
   clearLaunchParams();
   if (params.play) openGameFromAlert(params.play);
+  else if (inviteRoom && !loadSavedGames().some(e => e.room === inviteRoom)) openInvite(inviteRoom);
 }
 initAlerts();

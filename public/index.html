@@ -102,6 +102,18 @@
   .saved-game.theirs .saved-turn { color: var(--amber); }
   .saved-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .alerts-text { color: var(--mute); font-size: 13px; line-height: 1.45; margin: 4px 0 8px; }
+  .home-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: -4px 0 10px; }
+  .home-hello { color: var(--ink); font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gear-btn { position: relative; flex: none; width: 44px; height: 44px; padding: 0; font-size: 22px; line-height: 1; border-radius: 50%; }
+  .gear-dot { position: absolute; top: 4px; right: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+  .play-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .play-row > button { width: 100%; min-height: 52px; }
+  body.no-server .play-row { grid-template-columns: 1fr; }
+  body.no-server .server-only { display: none !important; }
+  .join-inline { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+  .join-inline > button { min-width: 96px; }
+  .settings-card { margin-top: 16px; }
+  .move-code { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 12px; word-break: break-all; resize: vertical; background: #04121a; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-top: 8px; }
   .resume-card .saved-name { color: var(--ink); font-size: 15px; font-weight: 600; }
   .resume-card .saved-meta { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .saved-game button { flex: 0 0 auto; width: auto; padding-inline: 16px; }
@@ -1182,38 +1194,72 @@
 
   <!-- HOME -->
   <section id="home" class="card hidden">
+    <div class="home-head">
+      <span id="homeHello" class="home-hello">Welcome</span>
+      <button class="gear-btn" onclick="openSettings()" aria-label="Settings" title="Settings">&#9881;<span id="gearDot" class="gear-dot hidden"></span></button>
+    </div>
     <div id="savedGames" class="resume-card hidden">
       <strong>Your games</strong>
       <div id="savedList" class="saved-list"></div>
     </div>
-    <div id="alertsCard" class="resume-card alerts-card hidden">
-      <strong>Turn alerts</strong>
-      <p id="alertsText" class="alerts-text"></p>
-      <button id="alertsBtn" class="hidden" style="width:100%" onclick="toggleAlerts()">Turn on</button>
-    </div>
-    <h2>New engagement</h2>
+    <h2>Play</h2>
     <label for="gameSelect">Game</label>
     <select id="gameSelect"></select>
-    <label for="name1">Your call sign</label>
-    <input id="name1" maxlength="16" placeholder="e.g. Skipper">
-    <button class="primary mt" style="width:100%" onclick="createGame()">Start live multiplayer</button>
+    <div id="nameRow" class="hidden">
+      <label for="nameFirst">Your name</label>
+      <input id="nameFirst" maxlength="16" placeholder="e.g. Skipper" autocomplete="nickname">
+    </div>
+    <div class="play-row">
+      <button class="primary server-only" onclick="createGame()">Play a friend</button>
+      <button onclick="playComputer()">Play the computer</button>
+    </div>
+    <div class="server-only">
+      <label for="joinCode">Have a code?</label>
+      <div class="join-inline">
+        <input id="joinCode" class="code" maxlength="4" placeholder="...." autocomplete="off">
+        <button onclick="joinGame()">Join</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- INVITE: opened from an invitation link -->
+  <section id="invite" class="card hidden">
+    <h2>You're invited!</h2>
+    <p class="lede">Enter your name and tap Join to play.</p>
+    <div class="code-badge" id="inviteCode">....</div>
+    <label for="inviteName">Your name</label>
+    <input id="inviteName" maxlength="16" placeholder="e.g. Admiral" autocomplete="nickname">
+    <button class="primary mt" style="width:100%" onclick="joinInvite()">Join</button>
+    <button class="ghost mt" style="width:100%" onclick="show('home')">Not now</button>
+  </section>
+
+  <!-- SETTINGS: behind the gear on the home screen -->
+  <section id="settings" class="card hidden">
+    <h2>Settings</h2>
+    <label for="playerName">Your name</label>
+    <input id="playerName" maxlength="16" placeholder="e.g. Skipper" autocomplete="nickname" oninput="savePlayerName(this.value)">
     <label for="botLevel">Computer skill</label>
     <select id="botLevel" onchange="saveBotLevel()">
       <option value="easy">Easy - still learning</option>
       <option value="normal">Normal</option>
       <option value="hard">Hard - no mercy</option>
     </select>
-    <button class="mt" style="width:100%" onclick="createBottyGame()">Play Botty - save on server</button>
-    <button class="ghost mt" style="width:100%" onclick="createComputerGame()">Play offline vs computer</button>
-    <p class="lede mt">Botty is always available while the server is running, and the room resumes from server storage. Offline mode stays in this browser and uses the same shared rules.</p>
-    <div class="divider">- OR -</div>
-    <h2 style="margin-top:6px">Join a game</h2>
-    <p id="inviteNotice" class="lede hidden">You've been invited! Enter your name and tap Join.</p>
-    <label for="joinCode">Game code</label>
-    <input id="joinCode" class="code" maxlength="4" placeholder="...." autocomplete="off">
-    <label for="name2">Your call sign</label>
-    <input id="name2" maxlength="16" placeholder="e.g. Admiral">
-    <button class="mt" style="width:100%" onclick="joinGame()">Join</button>
+    <div id="alertsCard" class="resume-card settings-card hidden">
+      <strong>Turn alerts</strong>
+      <p id="alertsText" class="alerts-text"></p>
+      <button id="alertsBtn" class="hidden" style="width:100%" onclick="toggleAlerts()">Turn on</button>
+    </div>
+    <div class="resume-card settings-card server-only">
+      <strong>Move games to another browser</strong>
+      <p class="alerts-text">Games are saved in the browser they were played in. To keep playing them somewhere else, like the home-screen app instead of Discord, copy the code here and paste it there.</p>
+      <button style="width:100%" onclick="copyMoveCode()">Copy my games code</button>
+      <textarea id="moveCodeOut" class="move-code hidden" rows="3" readonly aria-label="Your games code"></textarea>
+      <label for="moveCodeIn">Paste a code from another browser</label>
+      <textarea id="moveCodeIn" class="move-code" rows="3" autocomplete="off" spellcheck="false"></textarea>
+      <button class="mt" style="width:100%" onclick="importMoveCode()">Add these games</button>
+    </div>
+    <p class="lede mt">Play the computer saves on the server while it is running, otherwise in this browser. Games with a friend need the server.</p>
+    <button class="primary mt" style="width:100%" onclick="closeSettings()">Done</button>
   </section>
 
   <!-- LOBBY: created, waiting for opponent -->

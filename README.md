@@ -41,10 +41,20 @@ public/?mode=computer&game=onecard
 Solo rooms live only in browser `localStorage`; no server or shared database is used.
 The deployment URL is available from the repository's Pages settings after publishing.
 
+### Home screen
+
+The home screen greets the player by name and offers three things: **Play a friend**
+(a live room with an invitation), **Play the computer**, and a box for a friend's code.
+**Play the computer** seats Botty on the server when there is one, and plays offline in
+the browser on GitHub Pages, where the friend options are hidden. The name is asked for
+once and then kept, with the computer skill, turn alerts and moving games, behind the
+gear. An invitation link opens a short "You're invited" screen with just a name and Join.
+
 ### Saved games
 
-The home screen lists every game the browser holds a seat in (up to 12, newest first):
-live rooms with the opponent's name, Botty rooms, and offline games. **Home** inside a game
+The home screen lists every game the browser holds a seat in (up to 12): games where it
+is your turn first, then their turn, waiting rooms, computer games and finished games.
+Live rooms show the opponent's name. **Home** inside a game
 returns there and keeps an unfinished game saved; a finished game is cleared when you
 leave it, and the x on a list entry discards it. Starting another game never forgets an
 unfinished one, so a live game can be picked up days later from the same browser, as long
@@ -54,10 +64,17 @@ Saves are per browser and per address: `http://127.0.0.1:8081`, `http://localhos
 and the private Tailscale URL each keep their own list, and a private window or clearing
 site data loses it. A forgotten seat cannot be reclaimed by entering the room code again.
 
+Apps that open links in their own browser (Discord on iPhone, for one) keep a separate
+list too. To play the same games somewhere else, open **Settings** (the gear), tap **Copy
+my games code**, and paste it under **Paste a code from another browser** in the other
+browser's Settings. Both browsers can then play those seats. The code is the seat's
+password, so paste it only into your own browsers. Offline computer games stay where
+they were played.
+
 ### Computer skill
 
-The home screen's **Computer skill** picker (Easy, Normal, Hard) sets how well the
-offline computer and Botty play. The browser remembers the choice, each game keeps the
+**Computer skill** in Settings (Easy, Normal, Hard) sets how well the offline computer
+and Botty play. The browser remembers the choice, each game keeps the
 level it started with (**New game** reuses it), and the footer and saved list show it.
 Games saved before levels existed play at Normal.
 
@@ -181,8 +198,8 @@ A player creates a room and shares its four-character code with another permitte
 player. Most games are two-player; One Card supports up to four players before the
 host starts the hand.
 
-`Play Botty - save on server` creates a normal authenticated server room with Botty
-already seated. Botty uses the same shared computer-move hooks as offline play, waits
+**Play the computer** creates a normal authenticated server room with Botty already
+seated. Botty uses the same shared computer-move hooks as offline play, waits
 briefly before each move so the client can show turn changes, and remains available
 after browser or server restarts. Botty rooms are reserved for their creator and cannot
 be joined by another human.
@@ -194,16 +211,16 @@ downloading audio assets.
 
 ### Turn alerts
 
-A player can get a phone or desktop notification when it becomes their turn. The **Turn
-alerts** box on the home screen turns them on for that device. It appears only when the
+A player can get a phone or desktop notification when it becomes their turn. **Turn
+alerts** in Settings (the gear on the home screen) turns them on for that device. It appears only when the
 page is served by this server, not on GitHub Pages, and it needs HTTPS, so use the private
 Tailscale address (`http://127.0.0.1` also works for testing on the host itself).
 
-- **iPhone or iPad (iOS 16.4 or later):** open the game in Safari, tap Share, then **Add
-  to Home Screen**, and open the game from that icon. Tap **Turn on alerts** there and
-  allow notifications. The home-screen app keeps its own saved games, separate from
-  Safari's, so start or join games from the icon after installing it. A game joined in
-  Safari stays in Safari.
+- **iPhone or iPad (iOS 16.4 or later):** open the game in Safari (from Discord or another
+  app, use its menu to open the page in Safari), tap Share, then **Add to Home Screen**,
+  and open the game from that icon. Tap **Turn on alerts** there and allow notifications.
+  The home-screen app keeps its own saved games, separate from Safari's and Discord's;
+  bring existing games over with **Copy my games code** (see Saved games).
 - **Android, Chrome or Edge on a computer:** tap **Turn on alerts** and allow
   notifications.
 
