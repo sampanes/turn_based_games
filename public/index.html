@@ -795,6 +795,27 @@
   .uttt-mini.won-X .uttt-mini-winner { color: var(--amber); background: rgba(8,18,24,.84); border: 2px solid rgba(255,179,71,.5); text-shadow: 0 0 22px rgba(255,179,71,.85); }
   .uttt-mini.won-O .uttt-mini-winner { color: var(--sonar); background: rgba(8,18,24,.84); border: 2px solid rgba(52,231,196,.5); text-shadow: 0 0 22px rgba(52,231,196,.85); }
   .uttt-mini.won-draw .uttt-mini-winner { color: var(--mute); background: rgba(8,18,24,.84); font-size: clamp(14px, 4.5vw, 26px); letter-spacing: 2px; }
+  /* brushed marks: art/marks.png is a strip of eight 1-bit stamps (three X, a heavy X, three O,
+     a heavy O). A cell takes one of the three by its place on the board (m0..m2, set in
+     app.js) so neighbors differ; a won mini-board takes the heavy one. */
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .uttt-cell.X, .uttt-cell.O, .uttt-mini.won-X .uttt-mini-winner, .uttt-mini.won-O .uttt-mini-winner { font-size: 0; }
+    .uttt-cell.X::before, .uttt-cell.O::before, .uttt-mini.won-X .uttt-mini-winner::before, .uttt-mini.won-O .uttt-mini-winner::before {
+      content: ""; width: 78%; height: 78%; background: currentColor;
+      -webkit-mask-image: url(art/marks.png); mask-image: url(art/marks.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 800% 100%; mask-size: 800% 100%;
+      -webkit-mask-position: 0 0; mask-position: 0 0;
+    }
+    .uttt-cell.X.m1::before { -webkit-mask-position: 14.2857% 0; mask-position: 14.2857% 0; }
+    .uttt-cell.X.m2::before { -webkit-mask-position: 28.5714% 0; mask-position: 28.5714% 0; }
+    .uttt-cell.O::before { -webkit-mask-position: 57.1429% 0; mask-position: 57.1429% 0; }
+    .uttt-cell.O.m1::before { -webkit-mask-position: 71.4286% 0; mask-position: 71.4286% 0; }
+    .uttt-cell.O.m2::before { -webkit-mask-position: 85.7143% 0; mask-position: 85.7143% 0; }
+    .uttt-mini.won-X .uttt-mini-winner::before, .uttt-mini.won-O .uttt-mini-winner::before { width: 72%; height: 72%; filter: drop-shadow(0 0 9px currentColor); }
+    .uttt-mini.won-X .uttt-mini-winner::before { -webkit-mask-position: 42.8571% 0; mask-position: 42.8571% 0; }
+    .uttt-mini.won-O .uttt-mini-winner::before { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  }
   .uttt-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--mute); font-size: 12px; }
   .uttt-piece { font-weight: 900; margin-right: 4px; }
   .uttt-piece.X { color: var(--amber); }

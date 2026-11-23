@@ -27,6 +27,10 @@ banner of a game with a friend (your turn, win, lose), the bell on a saved game 
 your turn, and the bottle on the invite and share screens. Baked and not used yet:
 sunk, aim and draw.
 
+Sheet 5 is done: `art/sheets/05-marks.png`, baked to `public/art/marks.png`. Ultimate
+Tic-Tac-Toe cells take one of the three brushed marks by their place on the board, and a
+won mini-board takes the heavy one.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |

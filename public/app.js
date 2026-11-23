@@ -3382,6 +3382,7 @@ function renderUltimateTTT(d, v) {
         const cell = document.createElement('div');
         cell.className = 'uttt-cell'
           + (val === X ? ' X' : val === O ? ' O' : '')
+          + ' m' + ((idx + Math.floor(idx / 9)) % 3) // which of the three brushed marks this cell uses
           + (isValid ? ' valid' : '')
           + (isLast ? ' last' : '')
           + (isLast && newMove ? ' pop' : '');

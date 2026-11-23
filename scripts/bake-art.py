@@ -56,6 +56,14 @@ STAMPS = {
         "cell": 96,       # shown at 12 to 44 CSS px
         "margin": 0.04,
     },
+    # three brushed X, one heavy X, three brushed O, one heavy O
+    "marks.png": {
+        "sheet": "05-marks.png",
+        "cols": 4,
+        "rows": 2,
+        "cell": 96,       # shown at 24 to 80 CSS px
+        "margin": 0.03,
+    },
 }
 # Ships are not on a grid: each is one band of ink, top to bottom, bow to
 # the right. Baked as a 10 x 5 block of square cells: the left 5 x 5 holds
