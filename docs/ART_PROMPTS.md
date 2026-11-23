@@ -21,6 +21,12 @@ which is how the tall carrier and the short destroyer fit their rows. The grids 
 ship one cell at a time; the fleet list shows it whole. Hit cells and the small fleet
 tracker strips still use the old look.
 
+Sheet 4 is done: `art/sheets/04-markers.png`, baked to `public/art/markers.png`. In use:
+hit and miss on the Battleship grids, the bell, pennant and paper boat in the status
+banner of a game with a friend (your turn, win, lose), the bell on a saved game that is
+your turn, and the bottle on the invite and share screens. Baked and not used yet:
+sunk, aim and draw.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |

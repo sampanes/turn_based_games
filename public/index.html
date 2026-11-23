@@ -135,8 +135,8 @@
     content: ""; float: left; width: 34px; height: 34px; margin: -8px 2px -8px -4px;
     background: url(art/botty.png) 0 0 / 600% 100% no-repeat;
   }
-  body.vs-bot .status { letter-spacing: .2px; } /* buys back most of the width the face takes */
-  body.vs-bot #battle .status { font-size: 14px; } /* keeps "your turn" on one line beside the face */
+  body .status { letter-spacing: .2px; } /* buys back most of the width the face or mark takes */
+  #battle .status { font-size: 14px; } /* keeps "your turn" on one line beside the face or mark */
   body.vs-bot .status.them::before { background-position: 20% 0; }
   body.vs-bot .status.lose::before { background-position: 40% 0; }
   body.vs-bot .status.win::before { background-position: 60% 0; }
@@ -232,6 +232,29 @@
   @keyframes hitFlash { 0%, 100% { border-color: var(--line); } 35% { border-color: var(--fire); box-shadow: 0 0 26px rgba(255,91,81,.38); } }
   @keyframes missFlash { 0%, 100% { border-color: var(--line); } 35% { border-color: #fff; box-shadow: 0 0 22px rgba(255,255,255,.2); } }
   @keyframes targetBreathe { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
+
+  /* markers: art/markers.png is nine 1-bit stamps in a strip (hit, miss, sunk, aim, win, lose,
+     draw, your turn, invite), shown through a mask and colored by the text color */
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .grid.fire .cell.hit::after, .cell.scored-hit::after, #myGrid .cell.hit::after, .cell.incoming-hit::after, .cell.miss::after,
+    body:not(.vs-bot) .status.you::before, body:not(.vs-bot) .status.win::before, body:not(.vs-bot) .status.lose::before,
+    .saved-game.yours .saved-turn::before, #invite h2::before, #lobby h2::before {
+      content: ""; background: currentColor; text-shadow: none;
+      -webkit-mask-image: url(art/markers.png); mask-image: url(art/markers.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 900% 100%; mask-size: 900% 100%;
+      -webkit-mask-position: 0 0; mask-position: 0 0;
+    }
+    .grid.fire .cell.hit::after, .cell.scored-hit::after, #myGrid .cell.hit::after, .cell.incoming-hit::after { width: 76%; height: 76%; transform: none; }
+    .cell.miss::after { width: 64%; height: 64%; opacity: .7; -webkit-mask-position: 12.5% 0; mask-position: 12.5% 0; }
+    /* with a friend the banner carries a mark where Botty's face would be */
+    body:not(.vs-bot) .status.you::before, body:not(.vs-bot) .status.win::before, body:not(.vs-bot) .status.lose::before { float: left; width: 26px; height: 26px; margin: -4px 4px -4px 0; }
+    body:not(.vs-bot) .status.you::before { -webkit-mask-position: 87.5% 0; mask-position: 87.5% 0; }
+    body:not(.vs-bot) .status.win::before { -webkit-mask-position: 50% 0; mask-position: 50% 0; }
+    body:not(.vs-bot) .status.lose::before { -webkit-mask-position: 62.5% 0; mask-position: 62.5% 0; }
+    .saved-game.yours .saved-turn::before { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; -webkit-mask-position: 87.5% 0; mask-position: 87.5% 0; }
+    #invite h2::before, #lobby h2::before { display: inline-block; width: 22px; height: 22px; margin-right: 8px; vertical-align: -5px; -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  }
 
   /* placement fleet list */
   .fleet { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }

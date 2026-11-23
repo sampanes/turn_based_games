@@ -48,6 +48,14 @@ STAMPS = {
         "cell": 128,      # baked pixels per side; shown at 24 to 48 CSS px
         "margin": 0.04,   # empty border inside each baked cell
     },
+    # hit, miss, sunk, aim, win, lose, draw, your turn, invite
+    "markers.png": {
+        "sheet": "04-markers.png",
+        "cols": 3,
+        "rows": 3,
+        "cell": 96,       # shown at 12 to 44 CSS px
+        "margin": 0.04,
+    },
 }
 # Ships are not on a grid: each is one band of ink, top to bottom, bow to
 # the right. Baked as a 10 x 5 block of square cells: the left 5 x 5 holds
