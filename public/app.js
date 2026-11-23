@@ -968,16 +968,41 @@ function initPlacement() {
   renderFleetList(); renderPlaceGrid();
 }
 
+// Ship art. fleet.png holds each ship twice: lying east in the left 5 x 5 cells (row =
+// ship, column = cell from the stern) and heading south in the right 5 x 5 (column = ship,
+// row = cell from the stern). Returns cell key -> background-position for that cell.
+const FLEET_ART_ROW = { Carrier: 0, Battleship: 1, Cruiser: 2, Submarine: 3, Destroyer: 4 };
+function shipArtMap(ships) {
+  const map = new Map();
+  (ships || []).forEach(ship => {
+    const row = FLEET_ART_ROW[ship.name];
+    if (row == null || !ship.cells || !ship.cells.length) return;
+    const cells = ship.cells.map(key => key.split(',').map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const south = cells.length > 1 && cells[0][1] === cells[1][1];
+    cells.forEach(([r, c], i) => map.set(`${r},${c}`,
+      south ? `${(5 + row) / 9 * 100}% ${i / 4 * 100}%` : `${i / 9 * 100}% ${row / 4 * 100}%`));
+  });
+  return map;
+}
+// Call after setting cell.className: that assignment drops the class.
+function paintShipArt(cell, position) {
+  cell.classList.toggle('shipart', !!position);
+  cell.style.backgroundPosition = position || '';
+}
+
 function renderFleetList() {
   const list = $('fleetList'); list.innerHTML = '';
   fleetDef.forEach((s, i) => {
     const placed = placedShips.find(p => p.name === s.name);
     const row = document.createElement('div');
     row.className = 'ship-row' + (i === selectedShip ? ' active' : '') + (placed ? ' done' : '');
-    const pips = Array.from({ length: s.size }, () => '<span class="pip"></span>').join('');
+    const artRow = FLEET_ART_ROW[s.name];
+    const pips = artRow == null
+      ? `<span class="pips">${Array.from({ length: s.size }, () => '<span class="pip"></span>').join('')}</span>`
+      : `<span class="ship-pic" style="width:${s.size * 20}px;background-size:${1000 / s.size}% 500%;background-position:0 ${artRow * 25}%"></span>`;
     row.innerHTML = `<span class="ship-name">${s.name}</span>
       <span style="display:flex;align-items:center;gap:10px">
-        <span class="pips">${pips}</span>
+        ${pips}
         ${placed ? '<span class="check">ok</span>' : `<span style="color:var(--mute);font-size:12px">${s.size}</span>`}
       </span>`;
     row.onclick = () => {
@@ -1111,6 +1136,7 @@ function renderPlaceGrid(preview = []) {
   const previewSet = new Set(preview.map(item => item.key));
   const blocked = preview.some(item => item.blocked);
   const overlap = preview.some(item => item.overlap);
+  const art = shipArtMap(placedShips);
   document.querySelectorAll('#placeGrid .cell').forEach(cell => {
     const key = `${cell.dataset.r},${cell.dataset.c}`;
     let cls = 'cell';
@@ -1120,7 +1146,8 @@ function renderPlaceGrid(preview = []) {
     if (previewSet.has(key)) cls += blocked ? ' blocked' : ' preview';
     if (previewSet.has(key) && overlap) cls += ' overlap-preview';
     cell.className = cls;
-    cell.textContent = ship && ship.cells[0] === key ? ship.name[0] : '';
+    paintShipArt(cell, !previewSet.has(key) && art.get(key));
+    cell.textContent = ship && ship.cells[0] === key && !art.has(key) ? ship.name[0] : '';
     cell.title = ship ? `${ship.name} - drag to move, double-tap to rotate` : '';
   });
 }
@@ -1528,6 +1555,8 @@ function renderBattle(d, v) {
     if (s.sunk && s.cells && !(concealedInKey && s.cells.includes(concealedInKey))) s.cells.forEach(key => mySunkCells.add(key));
   });
 
+  const myArt = shipArtMap(v.myFleet);
+  const enemyArt = shipArtMap(v.enemyFleet);
   // firing grid = my shots on enemy
   document.querySelectorAll('#fireGrid .cell').forEach(cell => {
     const r = +cell.dataset.r;
@@ -1540,6 +1569,7 @@ function renderBattle(d, v) {
     if (!val && enemyRevealCells.has(key)) cls += ' reveal-ship';
     if (!hidden && shot && shot.by === d.you && shot.r === r && shot.c === c) cls += ' last-shot outgoing-shot';
     cell.className = cls;
+    paintShipArt(cell, !val && enemyRevealCells.has(key) && enemyArt.get(key));
     cell.setAttribute('aria-label', val ? `Your ${val} at ${coordLabel(r, c)}` : `Aim at ${coordLabel(r, c)}`);
   });
   // my fleet grid, with enemy shots shown
@@ -1557,6 +1587,7 @@ function renderBattle(d, v) {
     if (sq.shot === 'hit' && mySunkCells.has(key)) cls += ' sunk-ship';
     if (!hideShot && shot && shot.by !== d.you && shot.r === r && shot.c === c) cls += ' last-shot incoming-shot';
     cell.className = cls;
+    paintShipArt(cell, !sq.shot && sq.ship && myArt.get(key));
     const shipText = sq.ship ? 'ship' : 'water';
     cell.setAttribute('aria-label', sq.shot ? `Opponent ${sq.shot} on your ${shipText} at ${coordLabel(r, c)}` : `Your ${shipText} at ${coordLabel(r, c)}`);
   });

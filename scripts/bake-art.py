@@ -49,6 +49,22 @@ STAMPS = {
         "margin": 0.04,   # empty border inside each baked cell
     },
 }
+# Ships are not on a grid: each is one band of ink, top to bottom, bow to
+# the right. Baked as a 10 x 5 block of square cells: the left 5 x 5 holds
+# the ships lying east (row = ship, column = cell from the stern), the right
+# 5 x 5 holds them heading south (column = ship, row = cell from the stern).
+FLEET = {
+    "fleet.png": {
+        "sheet": "03-fleet.png",
+        "lengths": [5, 4, 3, 3, 2],   # cells per ship, in sheet order
+        "cell": 64,                   # baked pixels per grid cell
+        "end_gap": 0.07,              # clear water at bow and stern, in cells
+        # A ship scaled to its length may be too tall or too slight for its
+        # row; it is stretched across the beam into this range (in cells).
+        "beam": (0.76, 0.92),
+        "ink": (0xBF, 0xE6, 0xEC),
+    },
+}
 PICTURES = {
     "botty.png": {
         "sheet": "02-botty.png",
@@ -93,6 +109,49 @@ def bake_stamps(spec):
     # Threshold after the downscale: no gray edge pixels, so the file is 1-bit.
     bits = strip.point(lambda p: 1 if p >= 128 else 0).convert("P")
     bits.putpalette([0, 0, 0, 255, 255, 255])
+    buffer = io.BytesIO()
+    bits.save(buffer, "PNG", optimize=True, bits=1, transparency=0)
+    return buffer.getvalue()
+
+
+def ink_bands(ink):
+    """Rows of a sheet that hold ink, as (top, bottom) runs."""
+    width, height = ink.size
+    bands, start = [], None
+    for y in range(height + 1):
+        inked = y < height and ink.crop((0, y, width, y + 1)).getbbox() is not None
+        if inked and start is None:
+            start = y
+        if not inked and start is not None:
+            if y - start > 20:
+                bands.append((start, y))
+            start = None
+    return bands
+
+
+def bake_fleet(spec):
+    ink = ink_mask(Image.open(os.path.join(SHEETS, spec["sheet"])))
+    bands = ink_bands(ink)
+    lengths, cell = spec["lengths"], spec["cell"]
+    if len(bands) != len(lengths):
+        raise SystemExit(f"{spec['sheet']}: found {len(bands)} ships, expected {len(lengths)}")
+    longest = max(lengths)
+    east = Image.new("L", (cell * longest, cell * len(lengths)), 0)
+    low, high = spec["beam"]
+    for row, ((top, bottom), length) in enumerate(zip(bands, lengths)):
+        ship = ink.crop((0, top, ink.size[0], bottom))
+        ship = ship.crop(ship.getbbox())
+        out_w = round((length - 2 * spec["end_gap"]) * cell)
+        beam = ship.size[1] * out_w / ship.size[0] / cell
+        out_h = round(min(max(beam, low), high) * cell)
+        ship = ship.resize((out_w, out_h), Image.LANCZOS)
+        east.paste(ship, ((length * cell - out_w) // 2, row * cell + (cell - out_h) // 2))
+    south = east.transpose(Image.ROTATE_270).transpose(Image.FLIP_LEFT_RIGHT)
+    block = Image.new("L", (east.size[0] + south.size[0], max(east.size[1], south.size[1])), 0)
+    block.paste(east, (0, 0))
+    block.paste(south, (east.size[0], 0))
+    bits = block.point(lambda p: 1 if p >= 128 else 0).convert("P")
+    bits.putpalette([0, 0, 0] + list(spec["ink"]))
     buffer = io.BytesIO()
     bits.save(buffer, "PNG", optimize=True, bits=1, transparency=0)
     return buffer.getvalue()
@@ -148,6 +207,7 @@ def main():
     stale = []
     os.makedirs(OUT, exist_ok=True)
     jobs = [(name, bake_stamps, spec) for name, spec in STAMPS.items()]
+    jobs += [(name, bake_fleet, spec) for name, spec in FLEET.items()]
     jobs += [(name, bake_pictures, spec) for name, spec in PICTURES.items()]
     for name, bake, spec in jobs:
         data = bake(spec)

@@ -136,6 +136,7 @@
     background: url(art/botty.png) 0 0 / 600% 100% no-repeat;
   }
   body.vs-bot .status { letter-spacing: .2px; } /* buys back most of the width the face takes */
+  body.vs-bot #battle .status { font-size: 14px; } /* keeps "your turn" on one line beside the face */
   body.vs-bot .status.them::before { background-position: 20% 0; }
   body.vs-bot .status.lose::before { background-position: 40% 0; }
   body.vs-bot .status.win::before { background-position: 60% 0; }
@@ -193,6 +194,12 @@
   .is-phone .grid.fire .cell, .is-phone #placeGrid .cell { cursor: pointer; }
   .cell.ship { background: #2c5a6b; box-shadow: inset 0 0 0 1px #3c7a90; color: #d9fbff; font-size: clamp(10px, 2.8vw, 15px); text-shadow: 0 1px 5px rgba(0,0,0,.45); }
   .cell.ship-bow { box-shadow: inset 0 0 0 2px rgba(52,231,196,.7), 0 0 12px rgba(52,231,196,.15); }
+  /* ship art: art/fleet.png is a 10 x 5 block of cells (scripts/bake-art.py); each grid cell
+     shows its one cell of the ship, placed by shipArtMap() in app.js */
+  .cell.shipart, .ship-pic { background-image: url(art/fleet.png); background-repeat: no-repeat; }
+  .cell.shipart { background-color: #173c4b; background-size: 1000% 500%; box-shadow: none; font-size: 0; }
+  .ship-pic { display: block; height: 20px; opacity: .9; }
+  .ship-row.done .ship-pic { opacity: .45; }
   .cell.hit { background: radial-gradient(circle at 35% 30%, #ffb0aa 0 12%, var(--fire) 38%, #8e1622 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 0 12px rgba(255,91,81,.28); }
   .grid.fire .cell.hit::after, .cell.scored-hit::after { content: "✓"; color: #fff7f6; text-shadow: 0 2px 8px rgba(42,6,4,.85); transform: rotate(-8deg); }
   #myGrid .cell.hit::after, .cell.incoming-hit::after { content: "✕"; color: #2a0604; text-shadow: 0 1px 4px rgba(255,255,255,.3); }
@@ -320,6 +327,7 @@
   @keyframes sinkPop { 0% { transform: scale(1); } 30% { transform: scale(1.25); filter: brightness(2.2); } 100% { transform: scale(1); filter: brightness(.8); } }
   .cell.sunk-ship { filter: saturate(.5) brightness(.72); box-shadow: inset 0 0 0 2px rgba(142,22,34,.85); }
   .cell.reveal-ship { background: rgba(44,90,107,.45); box-shadow: inset 0 0 0 1px rgba(60,122,144,.7); }
+  .cell.reveal-ship.shipart { background: rgba(23,60,75,.8) url(art/fleet.png) no-repeat; background-size: 1000% 500%; opacity: .8; }
 
   /* wide screens / landscape: boards side by side, no tilt */
   @media (min-aspect-ratio: 6/5) {

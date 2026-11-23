@@ -15,6 +15,12 @@ The surprised and asleep frames are baked and not used yet. The generator return
 real transparent background; previews that ignore transparency show a glow that is not
 in the picture.
 
+Sheet 3 is done: `art/sheets/03-fleet.png`, baked to `public/art/fleet.png`. Each ship
+is scaled to its length in cells and then stretched across the beam into a common range,
+which is how the tall carrier and the short destroyer fit their rows. The grids show a
+ship one cell at a time; the fleet list shows it whole. Hit cells and the small fleet
+tracker strips still use the old look.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |
