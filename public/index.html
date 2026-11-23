@@ -113,10 +113,37 @@
   .join-inline { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
   .join-inline > button { min-width: 96px; }
   .settings-card { margin-top: 16px; }
+  /* game emblems: one 1-bit strip (art/emblems.png, baked by scripts/bake-art.py) shown
+     through a mask, so the color is whatever the element's text color is */
+  .emblem {
+    display: none; flex: none; width: 28px; height: 28px; background: currentColor;
+    -webkit-mask-image: url(art/emblems.png); mask-image: url(art/emblems.png);
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-size: 900% 100%; mask-size: 900% 100%;
+    -webkit-mask-position: 0 0; mask-position: 0 0;
+  }
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) { .emblem { display: block; } }
+  .emblem.g-connectfour { -webkit-mask-position: 12.5% 0; mask-position: 12.5% 0; }
+  .emblem.g-dotsboxes { -webkit-mask-position: 25% 0; mask-position: 25% 0; }
+  .emblem.g-mancala { -webkit-mask-position: 37.5% 0; mask-position: 37.5% 0; }
+  .emblem.g-ultimatettt { -webkit-mask-position: 50% 0; mask-position: 50% 0; }
+  .emblem.g-onecard { -webkit-mask-position: 62.5% 0; mask-position: 62.5% 0; }
+  .game-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .game-tile {
+    display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; min-height: 94px;
+    padding: 11px 4px 8px; background: var(--abyss); color: var(--mute); font-size: 11px; letter-spacing: .2px; line-height: 1.25;
+  }
+  .game-tile .emblem { width: 44px; height: 44px; }
+  .game-tile-name { color: var(--ink); }
+  .game-tile[aria-checked="true"] { border-color: var(--sonar); color: var(--sonar); background: rgba(52,231,196,.08); box-shadow: 0 0 14px rgba(52,231,196,.14); }
+  .saved-game > .emblem { width: 24px; height: 24px; color: var(--mute); }
+  .saved-game.yours > .emblem { color: var(--sonar); }
+  .saved-game.theirs > .emblem { color: var(--amber); }
+  @media (max-width: 359px) { .saved-game > .emblem { display: none; } } /* no room beside the name on the narrowest phones */
   .move-code { width: 100%; box-sizing: border-box; font-family: inherit; font-size: 12px; word-break: break-all; resize: vertical; background: #04121a; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px; margin-top: 8px; }
   .resume-card .saved-name { color: var(--ink); font-size: 15px; font-weight: 600; }
   .resume-card .saved-meta { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .saved-game button { flex: 0 0 auto; width: auto; padding-inline: 16px; }
+  .saved-game button { flex: 0 0 auto; width: auto; padding-inline: 12px; }
   .saved-game .saved-drop { padding-inline: 0; width: var(--tap-target, 44px); }
 
   /* code share */
@@ -1203,8 +1230,9 @@
       <div id="savedList" class="saved-list"></div>
     </div>
     <h2>Play</h2>
-    <label for="gameSelect">Game</label>
-    <select id="gameSelect"></select>
+    <label id="gameLabel">Game</label>
+    <div id="gameTiles" class="game-tiles" role="radiogroup" aria-labelledby="gameLabel"></div>
+    <select id="gameSelect" class="hidden" aria-hidden="true" tabindex="-1"></select>
     <div id="nameRow" class="hidden">
       <label for="nameFirst">Your name</label>
       <input id="nameFirst" maxlength="16" placeholder="e.g. Skipper" autocomplete="nickname">

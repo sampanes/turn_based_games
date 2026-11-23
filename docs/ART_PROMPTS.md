@@ -1,8 +1,12 @@
 # Art prompts
 
 Prompts for image assets, written against what the client draws today (everything is
-CSS; there is not one image besides the app icon). Nothing here is generated or wired
-in yet.
+CSS; the app icon was the only image).
+
+Done so far: sheet 1. Its raw sheet is `art/sheets/01-game-emblems.png`, baked to
+`public/art/emblems.png` and shown on the home screen (game picker tiles, saved rows).
+Cell 3 was redone as a single icon and pasted into the sheet; ask for a lone icon
+whenever one cell of a sheet misses.
 
 ## Where art pays, in order
 
@@ -33,7 +37,8 @@ Two kinds of asset, and the prompt style differs for each.
   PNG with every pixel snapped to the nearest ink, so the file has 6 to 8 colors
   no matter what the generator did.
 
-Rules for the bake step (a `scripts/bake-art.py`, not written yet):
+Rules for the bake step (`python scripts/bake-art.py`, `--check` to verify; needs
+Pillow; stamp sheets only so far):
 
 - Raw generator output is kept in `art/sheets/` and is never referenced by the page.
 - Slice each sheet by its grid, trim, downscale to 2x the display size, then threshold

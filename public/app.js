@@ -145,6 +145,7 @@ function applyLaunchGame(gameId) {
   const select = $('gameSelect');
   if (!select || !gameId || !gameMeta(gameId)) return;
   select.value = gameId;
+  syncGameTiles();
   applyDeviceClasses('home');
 }
 function clearLaunchParams() {
@@ -168,6 +169,41 @@ function populateGameSelect() {
     if (game.description) option.title = game.description;
     select.appendChild(option);
   }
+  // The tiles are the picker people see; the hidden select stays the one place
+  // the chosen game is stored, so everything that reads it keeps working.
+  const tiles = $('gameTiles');
+  if (!tiles) return;
+  tiles.innerHTML = '';
+  for (const game of gameCatalog()) {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'game-tile';
+    tile.dataset.game = game.id;
+    tile.setAttribute('role', 'radio');
+    if (game.description) tile.title = game.description;
+    const emblem = document.createElement('span');
+    emblem.className = 'emblem g-' + game.id;
+    emblem.setAttribute('aria-hidden', 'true');
+    const name = document.createElement('span');
+    name.className = 'game-tile-name';
+    name.textContent = game.name;
+    tile.append(emblem, name);
+    tile.onclick = () => pickGame(game.id);
+    tiles.appendChild(tile);
+  }
+  syncGameTiles();
+}
+function pickGame(gameId) {
+  const select = $('gameSelect');
+  if (!select || select.value === gameId) return;
+  select.value = gameId;
+  select.dispatchEvent(new Event('change'));
+}
+function syncGameTiles() {
+  const tiles = $('gameTiles');
+  if (!tiles) return;
+  const picked = selectedGameId();
+  Array.from(tiles.children).forEach(tile => tile.setAttribute('aria-checked', tile.dataset.game === picked ? 'true' : 'false'));
 }
 function soloApi(path, method, body) {
   const payload = { ...(body || {}) };
@@ -609,6 +645,12 @@ function renderSavedList() {
     drop.textContent = '\u00d7'; // multiplication sign
     drop.setAttribute('aria-label', `Discard ${name.textContent} ${who}`);
     drop.onclick = () => discardSavedGame(entry);
+    if (meta) {
+      const emblem = document.createElement('span');
+      emblem.className = 'emblem g-' + entry.game;
+      emblem.setAttribute('aria-hidden', 'true');
+      row.append(emblem);
+    }
     row.append(info, resume, drop);
     list.appendChild(row);
   });
@@ -3368,7 +3410,7 @@ async function moveUltimateTTT(idx) {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && pollTimer) poll(); });
 ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'].forEach(type => document.addEventListener(type, mncEnsureAudio, { passive: true }));
 $('joinCode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
-$('gameSelect').addEventListener('change', () => applyDeviceClasses('home'));
+$('gameSelect').addEventListener('change', () => { syncGameTiles(); applyDeviceClasses('home'); });
 window.addEventListener('resize', () => {
   applyDeviceClasses(document.querySelector('section:not(.hidden)')?.id || 'home');
   if (lastView && lastView.ui === 'onecard') layoutOneCardFan(lastView.hand || []);
