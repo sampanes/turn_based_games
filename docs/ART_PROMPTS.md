@@ -8,6 +8,13 @@ Done so far: sheet 1. Its raw sheet is `art/sheets/01-game-emblems.png`, baked t
 Cell 3 was redone as a single icon and pasted into the sheet; ask for a lone icon
 whenever one cell of a sheet misses.
 
+Sheet 2 is done too: `art/sheets/02-botty.png`, baked to `public/art/botty.png` (head
+and neck only, six frames). Against the computer the face sits in the status banner:
+calm on your turn, thinking on its turn, delighted when it wins, rattled when it loses.
+The surprised and asleep frames are baked and not used yet. The generator returned a
+real transparent background; previews that ignore transparency show a glow that is not
+in the picture.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |
@@ -38,7 +45,7 @@ Two kinds of asset, and the prompt style differs for each.
   no matter what the generator did.
 
 Rules for the bake step (`python scripts/bake-art.py`, `--check` to verify; needs
-Pillow; stamp sheets only so far):
+Pillow):
 
 - Raw generator output is kept in `art/sheets/` and is never referenced by the page.
 - Slice each sheet by its grid, trim, downscale to 2x the display size, then threshold

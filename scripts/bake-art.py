@@ -9,6 +9,10 @@ docs/ART_PROMPTS.md for how the sheets are made. Needs Pillow.
 A stamp sheet is black ink on white. Each cell becomes a 1-bit mask with a
 transparent background; the page shows it through CSS mask-image, so the
 color comes from the page, not from the file.
+
+A picture sheet is flat color on a transparent background. Every pixel is
+snapped to the nearest ink below, so the baked file holds at most eight
+colors whatever the generator painted.
 """
 import io
 import os
@@ -20,16 +24,40 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHEETS = os.path.join(ROOT, "art", "sheets")
 OUT = os.path.join(ROOT, "public", "art")
 
-# One strip per stamp sheet: cells left to right, in sheet reading order.
-# The page addresses a cell by its index, so the order here is a contract
-# with the .emblem rules in public/index.html.
+# The page's own colors (the :root variables in public/index.html).
+INKS = [
+    (0x06, 0x14, 0x1B),  # deep navy
+    (0x11, 0x31, 0x3F),  # hull
+    (0x1D, 0x4A, 0x5E),  # slate
+    (0x34, 0xE7, 0xC4),  # sonar teal
+    (0xFF, 0xB3, 0x47),  # amber
+    (0x96, 0x54, 0x0F),  # dark amber
+    (0xCF, 0xE9, 0xEC),  # cream
+    (0xFF, 0x5B, 0x51),  # coral
+]
+CLEAR = len(INKS)  # palette index used for transparent pixels
+
+# One strip per sheet: cells left to right, in sheet reading order. The page
+# addresses a cell by its index, so the order here is a contract with the
+# .emblem and .botty rules in public/index.html.
 STAMPS = {
     "emblems.png": {
         "sheet": "01-game-emblems.png",
         "cols": 3,
         "rows": 3,
-        "cell": 128,      # baked pixels per side; shown at 28 to 48 CSS px
+        "cell": 128,      # baked pixels per side; shown at 24 to 48 CSS px
         "margin": 0.04,   # empty border inside each baked cell
+    },
+}
+PICTURES = {
+    "botty.png": {
+        "sheet": "02-botty.png",
+        "cols": 3,
+        "rows": 2,
+        "height": 132,    # baked pixels tall; shown at 36 to 64 CSS px
+        # Keep only the top of each cell (head and neck), as a share of the
+        # cell's inked height. The shoulders are dark and vanish on the page.
+        "keep": 0.8,
     },
 }
 
@@ -39,17 +67,21 @@ def ink_mask(image):
     return image.convert("L").point(lambda p: 255 if p < 128 else 0)
 
 
+def cells(sheet, cols, rows):
+    width, height = sheet.size
+    for index in range(cols * rows):
+        col, row = index % cols, index // cols
+        yield sheet.crop((col * width // cols, row * height // rows,
+                          (col + 1) * width // cols, (row + 1) * height // rows))
+
+
 def bake_stamps(spec):
     sheet = Image.open(os.path.join(SHEETS, spec["sheet"]))
-    width, height = sheet.size
     cols, rows, cell = spec["cols"], spec["rows"], spec["cell"]
     strip = Image.new("L", (cell * cols * rows, cell), 0)
     inner = round(cell * (1 - 2 * spec["margin"]))
-    for index in range(cols * rows):
-        col, row = index % cols, index // cols
-        box = (col * width // cols, row * height // rows,
-               (col + 1) * width // cols, (row + 1) * height // rows)
-        ink = ink_mask(sheet.crop(box))
+    for index, piece in enumerate(cells(sheet, cols, rows)):
+        ink = ink_mask(piece)
         bounds = ink.getbbox()
         if not bounds:
             raise SystemExit(f"{spec['sheet']}: cell {index + 1} is empty")
@@ -66,12 +98,59 @@ def bake_stamps(spec):
     return buffer.getvalue()
 
 
+def ink_palette():
+    flat = [channel for ink in INKS for channel in ink]
+    holder = Image.new("P", (1, 1))
+    holder.putpalette(flat + [0] * (768 - len(flat)))
+    return holder
+
+
+def snap_to_inks(image):
+    """RGBA -> P image: nearest ink where opaque, CLEAR where transparent."""
+    image = image.convert("RGBA")
+    solid = image.getchannel("A").point(lambda p: 255 if p >= 128 else 0)
+    snapped = image.convert("RGB").quantize(palette=ink_palette(), dither=Image.NONE)
+    snapped.paste(CLEAR, mask=solid.point(lambda p: 255 - p))
+    return snapped
+
+
+def bake_pictures(spec):
+    sheet = Image.open(os.path.join(SHEETS, spec["sheet"])).convert("RGBA")
+    frames = []
+    for index, piece in enumerate(cells(sheet, spec["cols"], spec["rows"])):
+        bounds = piece.getchannel("A").point(lambda p: 255 if p >= 128 else 0).getbbox()
+        if not bounds:
+            raise SystemExit(f"{spec['sheet']}: cell {index + 1} is empty")
+        frames.append(piece.crop(bounds))
+    # Every frame gets the same box, measured from its own top-left corner, so
+    # the frames register when the page swaps one for another.
+    width = min(frame.size[0] for frame in frames)
+    height = round(min(frame.size[1] for frame in frames) * spec["keep"])
+    out_h = spec["height"]
+    out_w = round(width * out_h / height)
+    strip = Image.new("P", (out_w * len(frames), out_h), CLEAR)
+    strip.putpalette(ink_palette().getpalette())
+    for index, frame in enumerate(frames):
+        frame = frame.crop((0, 0, width, height))
+        # Transparent pixels can hold any leftover color; clear them before the
+        # downscale so it does not bleed into the edge.
+        clean = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+        clean.paste(frame, mask=frame.getchannel("A").point(lambda p: 255 if p >= 128 else 0))
+        small = clean.convert("RGBa").resize((out_w, out_h), Image.LANCZOS).convert("RGBA")
+        strip.paste(snap_to_inks(small), (index * out_w, 0))
+    buffer = io.BytesIO()
+    strip.save(buffer, "PNG", optimize=True, bits=4, transparency=CLEAR)
+    return buffer.getvalue()
+
+
 def main():
     check = "--check" in sys.argv[1:]
     stale = []
     os.makedirs(OUT, exist_ok=True)
-    for name, spec in STAMPS.items():
-        data = bake_stamps(spec)
+    jobs = [(name, bake_stamps, spec) for name, spec in STAMPS.items()]
+    jobs += [(name, bake_pictures, spec) for name, spec in PICTURES.items()]
+    for name, bake, spec in jobs:
+        data = bake(spec)
         path = os.path.join(OUT, name)
         current = None
         if os.path.exists(path):

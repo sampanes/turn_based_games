@@ -798,6 +798,8 @@ function updateSoloRestartButtons() {
   // Offline and Botty rooms have nobody to invite.
   const private_ = !!(session && (session.mode === 'computer' || session.bot));
   document.querySelectorAll('.room-share').forEach(el => el.classList.toggle('hidden', private_));
+  // Shows Botty's face in the status banner (see body.vs-bot in index.html).
+  document.body.classList.toggle('vs-bot', private_);
 }
 
 

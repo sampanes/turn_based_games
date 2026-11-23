@@ -128,6 +128,17 @@
   .emblem.g-mancala { -webkit-mask-position: 37.5% 0; mask-position: 37.5% 0; }
   .emblem.g-ultimatettt { -webkit-mask-position: 50% 0; mask-position: 50% 0; }
   .emblem.g-onecard { -webkit-mask-position: 62.5% 0; mask-position: 62.5% 0; }
+  /* Botty: six faces in one strip (art/botty.png, baked by scripts/bake-art.py). Against the
+     computer the face rides in the status banner and follows its state: calm on your turn,
+     thinking on its own, delighted when it wins, rattled when it loses. */
+  body.vs-bot .status::before {
+    content: ""; float: left; width: 34px; height: 34px; margin: -8px 2px -8px -4px;
+    background: url(art/botty.png) 0 0 / 600% 100% no-repeat;
+  }
+  body.vs-bot .status { letter-spacing: .2px; } /* buys back most of the width the face takes */
+  body.vs-bot .status.them::before { background-position: 20% 0; }
+  body.vs-bot .status.lose::before { background-position: 40% 0; }
+  body.vs-bot .status.win::before { background-position: 60% 0; }
   .game-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .game-tile {
     display: flex; flex-direction: column; align-items: center; gap: 7px; min-width: 0; min-height: 94px;
