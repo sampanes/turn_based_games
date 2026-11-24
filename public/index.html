@@ -795,6 +795,32 @@
   .uttt-mini.won-X .uttt-mini-winner { color: var(--amber); background: rgba(8,18,24,.84); border: 2px solid rgba(255,179,71,.5); text-shadow: 0 0 22px rgba(255,179,71,.85); }
   .uttt-mini.won-O .uttt-mini-winner { color: var(--sonar); background: rgba(8,18,24,.84); border: 2px solid rgba(52,231,196,.5); text-shadow: 0 0 22px rgba(52,231,196,.85); }
   .uttt-mini.won-draw .uttt-mini-winner { color: var(--mute); background: rgba(8,18,24,.84); font-size: clamp(14px, 4.5vw, 26px); letter-spacing: 2px; }
+  /* player sigils: art/sigils.png is a strip of nine 1-bit stamps (anchor, compass star, whale,
+     lighthouse, octopus, sailboat, shell, crab, ship wheel). app.js picks one per seat from the
+     player's name and sets --sg-you and --sg-opp (positions along the strip) on the body. */
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .db-box.you::before, .db-box.opponent::before, .dots-player strong::before,
+    .cf-disc.you::before, .cf-disc.opponent::before {
+      content: "";
+      -webkit-mask-image: url(art/sigils.png); mask-image: url(art/sigils.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 900% 100%; mask-size: 900% 100%;
+      -webkit-mask-position: var(--sg-you, 0%) 0; mask-position: var(--sg-you, 0%) 0;
+    }
+    .db-box.opponent::before, .dots-player.opponent strong::before, .cf-disc.opponent::before {
+      -webkit-mask-position: var(--sg-opp, 50%) 0; mask-position: var(--sg-opp, 50%) 0;
+    }
+    .db-box.you::before, .db-box.opponent::before { position: absolute; inset: 16%; }
+    .db-box.you::before, .dots-player.you strong::before { background: var(--dots-you); }
+    .db-box.opponent::before, .dots-player.opponent strong::before { background: var(--dots-opp); }
+    .dots-player strong::before { display: inline-block; width: 15px; height: 15px; margin-right: 4px; vertical-align: -2px; }
+    /* The narrowest phones have no room beside a name; the boxes still carry the sigil. */
+    @media (max-width: 359px) { .dots-player strong::before { display: none; } }
+    /* On a disc the sigil is pressed into the face, in place of the plain inner ring. */
+    .cf-disc.you::before, .cf-disc.opponent::before { inset: 19%; border-radius: 0; box-shadow: none; }
+    .cf-disc.you::before { background: rgba(2,58,70,.7); }
+    .cf-disc.opponent::before { background: rgba(92,48,2,.7); }
+  }
   /* brushed marks: art/marks.png is a strip of eight 1-bit stamps (three X, a heavy X, three O,
      a heavy O). A cell takes one of the three by its place on the board (m0..m2, set in
      app.js) so neighbors differ; a won mini-board takes the heavy one. */

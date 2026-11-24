@@ -18,7 +18,7 @@ import io
 import os
 import sys
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHEETS = os.path.join(ROOT, "art", "sheets")
@@ -64,6 +64,18 @@ STAMPS = {
         "cell": 96,       # shown at 24 to 80 CSS px
         "margin": 0.03,
     },
+    # anchor, compass star, whale, lighthouse, octopus, sailboat, shell,
+    # crab, ship wheel
+    "sigils.png": {
+        "sheet": "06-sigils.png",
+        "cols": 3,
+        "rows": 3,
+        "cell": 96,       # shown at 16 to 56 CSS px
+        "margin": 0.03,
+        # The sheet came back as black discs with the figure left white.
+        # Keep the figure and drop the disc.
+        "knockout": True,
+    },
 }
 # Ships are not on a grid: each is one band of ink, top to bottom, bow to
 # the right. Baked as a 10 x 5 block of square cells: the left 5 x 5 holds
@@ -99,6 +111,17 @@ def ink_mask(image):
     return image.convert("L").point(lambda p: 255 if p < 128 else 0)
 
 
+def knockout_mask(image):
+    """A white figure inside a black disc -> L image, 255 on the figure."""
+    paper = image.convert("L").point(lambda p: 255 if p >= 128 else 0)
+    # A white frame joins the paper outside the disc into one region; filling
+    # it from a corner leaves only the white that the disc encloses.
+    framed = Image.new("L", (paper.size[0] + 2, paper.size[1] + 2), 255)
+    framed.paste(paper, (1, 1))
+    ImageDraw.floodfill(framed, (0, 0), 0)
+    return framed.crop((1, 1, paper.size[0] + 1, paper.size[1] + 1))
+
+
 def cells(sheet, cols, rows):
     width, height = sheet.size
     for index in range(cols * rows):
@@ -113,7 +136,7 @@ def bake_stamps(spec):
     strip = Image.new("L", (cell * cols * rows, cell), 0)
     inner = round(cell * (1 - 2 * spec["margin"]))
     for index, piece in enumerate(cells(sheet, cols, rows)):
-        ink = ink_mask(piece)
+        ink = knockout_mask(piece) if spec.get("knockout") else ink_mask(piece)
         bounds = ink.getbbox()
         if not bounds:
             raise SystemExit(f"{spec['sheet']}: cell {index + 1} is empty")

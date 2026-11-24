@@ -31,6 +31,13 @@ Sheet 5 is done: `art/sheets/05-marks.png`, baked to `public/art/marks.png`. Ult
 Tic-Tac-Toe cells take one of the three brushed marks by their place on the board, and a
 won mini-board takes the heavy one.
 
+Sheet 6 is done: `art/sheets/06-sigils.png`, baked to `public/art/sigils.png`. The
+generator drew each sigil white inside a black disc, against the prompt; the bake keeps
+the figure and drops the disc (`knockout` in the recipe), so no re-roll was needed. A
+seat takes its sigil from the player's name. In use: claimed boxes and the name row in
+Dots and Boxes, and the disc faces in Connect Four. Not yet: One Card seat chips, saved
+rows.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |

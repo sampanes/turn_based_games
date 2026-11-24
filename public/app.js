@@ -1700,6 +1700,31 @@ function battleStatusText(v, d) {
 }
 
 
+// ---------------- player sigils ----------------
+// art/sigils.png holds nine marks. A seat takes its mark from the player's
+// name, so one person keeps one mark from game to game. Seats are settled in
+// slot order and a repeat moves on to the next mark, so both phones agree.
+const SIGIL_COUNT = 9;
+function sigilForName(name) {
+  let hash = 0;
+  for (const ch of String(name || '').trim().toLowerCase()) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  return hash % SIGIL_COUNT;
+}
+function applySeatSigils(d) {
+  const opponent = (d.players || []).find(player => player.slot !== d.you);
+  const seats = [
+    { slot: d.you, name: d.youName || 'You' },
+    { slot: opponent ? opponent.slot : (d.you === 'A' ? 'B' : 'A'), name: (opponent && opponent.name) || d.opponentName || 'Opponent' },
+  ].sort((a, b) => (a.slot < b.slot ? -1 : 1));
+  const first = sigilForName(seats[0].name);
+  let second = sigilForName(seats[1].name);
+  if (second === first) second = (second + 1) % SIGIL_COUNT;
+  const mine = seats[0].slot === d.you ? first : second;
+  const theirs = seats[0].slot === d.you ? second : first;
+  document.body.style.setProperty('--sg-you', `${mine / (SIGIL_COUNT - 1) * 100}%`);
+  document.body.style.setProperty('--sg-opp', `${theirs / (SIGIL_COUNT - 1) * 100}%`);
+}
+
 // ---------------- connect four ----------------
 const connectReducedMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
 function connectMotionOff() { return !!(connectReducedMotion && connectReducedMotion.matches); }
@@ -2093,6 +2118,7 @@ function renderConnectFour(d, v) {
   const cols = v.cols || 7;
   const opponentSlot = connectOpponentSlot(d);
   const opponentName = d.opponentName || 'Opponent';
+  applySeatSigils(d);
   const legal = v.legalMoves || [];
   const yourTurn = v.phase === 'battle' && v.turn === d.you;
 
@@ -2253,6 +2279,7 @@ function renderDotsBoxes(d, v) {
   const youScore = scores[d.you] || 0;
   const opponentScore = scores[opponentSlot] || 0;
 
+  applySeatSigils(d);
   $('dotsYouName').textContent = d.youName || 'You';
   $('dotsOpponentName').textContent = dotsPlayerName(d, opponentSlot);
   $('dotsYouScore').textContent = youScore;
