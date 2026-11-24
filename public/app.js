@@ -802,6 +802,17 @@ function updateSoloRestartButtons() {
   document.body.classList.toggle('vs-bot', private_);
 }
 
+// Botty nods off when it is left waiting on your turn. Any touch or key wakes it.
+const BOTTY_NAP_MS = 45000;
+let bottyNapTimer = null;
+function wakeBotty() {
+  document.body.classList.remove('botty-asleep');
+  clearTimeout(bottyNapTimer);
+  bottyNapTimer = setTimeout(() => document.body.classList.add('botty-asleep'), BOTTY_NAP_MS);
+}
+['pointerdown', 'touchstart', 'keydown'].forEach(type => document.addEventListener(type, wakeBotty, { capture: true, passive: true }));
+wakeBotty();
+
 
 function startPoll() { stopPoll(); pollTimer = setInterval(poll, 1000); }
 function stopPoll() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
@@ -1941,7 +1952,7 @@ function connectUpdateBanner() {
     if (connectAnimBusy()) return; // hold the old line until the last disc lands
     const tied = !v.winner;
     const won = v.winner === d.you;
-    desired = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    desired = 'status ' + (tied ? 'them draw' : won ? 'win' : 'lose');
     text = tied ? 'DRAW - the grid is full' : won ? 'VICTORY - four connected' : 'DEFEAT - rival connected four';
   } else if (session && v.turn === d.you) {
     const legal = v.legalMoves || [];
@@ -2370,7 +2381,7 @@ function renderDotsBoxes(d, v) {
   if (v.phase === 'over') {
     const tied = v.winner === 'draw' || !v.winner;
     const won = v.winner === d.you;
-    banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    banner.className = 'status ' + (tied ? 'them draw' : won ? 'win' : 'lose');
     banner.textContent = tied ? 'DRAW - every box claimed' : won ? 'VICTORY - most boxes claimed' : 'DEFEAT - opponent claimed more boxes';
     if (end) {
       end.className = 'dots-end ' + (tied ? 'draw' : won ? 'win' : 'lose');
@@ -3192,7 +3203,7 @@ function mncBanner(v, d) {
   if (v.phase === 'over') {
     const tied = v.winner === 'draw';
     const won = v.winner === v.myPiece;
-    banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    banner.className = 'status ' + (tied ? 'them draw' : won ? 'win' : 'lose');
     banner.textContent = tied
       ? `DRAW -- ${myScore} to ${oppScore}`
       : won
@@ -3463,7 +3474,7 @@ function renderUltimateTTT(d, v) {
   if (v.phase === 'over') {
     const tied = v.winner === 'draw';
     const won = v.winner === d.you;
-    banner.className = 'status ' + (tied ? 'them' : won ? 'win' : 'lose');
+    banner.className = 'status ' + (tied ? 'them draw' : won ? 'win' : 'lose');
     banner.textContent = tied ? 'DRAW - all boards claimed' : won ? 'VICTORY - three boards in a row' : 'DEFEAT - opponent claimed three boards in a row';
   } else if (v.isMyTurn) {
     const where = v.activeMini === -1 ? 'any open board' : `board ${v.activeMini + 1}`;
