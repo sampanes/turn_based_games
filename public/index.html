@@ -207,6 +207,16 @@
   .cell.shipart { background-color: #173c4b; background-size: 1000% 500%; box-shadow: none; font-size: 0; }
   .ship-pic { display: block; height: 20px; opacity: .9; }
   .ship-row.done .ship-pic { opacity: .45; }
+  /* a struck ship stays in view under its mark: dimmed when hit, darker once sunk (and
+     where masks work, a sunk ship becomes a coral outline: see the markers block) */
+  .cell.hit.shipart {
+    background: linear-gradient(rgba(6,20,27,.5), rgba(6,20,27,.5)), url(art/fleet.png) no-repeat #173c4b;
+    background-size: 1000% 500%; box-shadow: inset 0 0 0 2px rgba(255,91,81,.8);
+  }
+  .cell.hit.sunk-ship.shipart {
+    background: linear-gradient(rgba(6,20,27,.74), rgba(6,20,27,.74)), url(art/fleet.png) no-repeat #173c4b;
+    background-size: 1000% 500%; box-shadow: inset 0 0 0 2px rgba(142,22,34,.9); filter: none;
+  }
   .cell.hit { background: radial-gradient(circle at 35% 30%, #ffb0aa 0 12%, var(--fire) 38%, #8e1622 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 0 12px rgba(255,91,81,.28); }
   .grid.fire .cell.hit::after, .cell.scored-hit::after { content: "✓"; color: #fff7f6; text-shadow: 0 2px 8px rgba(42,6,4,.85); transform: rotate(-8deg); }
   #myGrid .cell.hit::after, .cell.incoming-hit::after { content: "✕"; color: #2a0604; text-shadow: 0 1px 4px rgba(255,255,255,.3); }
@@ -254,6 +264,16 @@
     }
     .grid.fire .cell.hit::after, .cell.scored-hit::after, #myGrid .cell.hit::after, .cell.incoming-hit::after { width: 76%; height: 76%; transform: none; }
     .cell.miss::after { width: 64%; height: 64%; opacity: .7; -webkit-mask-position: 12.5% 0; mask-position: 12.5% 0; }
+    /* over a ship the burst is coral; a sunk ship trades its bursts for its own outline in
+       coral, the same as in the fleet tracker (--ship-at is set by paintShipArt in app.js) */
+    .grid.fire .cell.hit.shipart::after, #myGrid .cell.hit.shipart::after { color: var(--fire); }
+    .cell.hit.sunk-ship.shipart { background: #2a0d14; box-shadow: inset 0 0 0 1px rgba(142,22,34,.7); }
+    .grid.fire .cell.hit.sunk-ship.shipart::after, #myGrid .cell.hit.sunk-ship.shipart::after {
+      width: 100%; height: 100%; opacity: .9; background: var(--fire);
+      -webkit-mask-image: url(art/fleet.png); mask-image: url(art/fleet.png);
+      -webkit-mask-size: 1000% 500%; mask-size: 1000% 500%;
+      -webkit-mask-position: var(--ship-at, 0 0); mask-position: var(--ship-at, 0 0);
+    }
     /* with a friend the banner carries a mark where Botty's face would be */
     body:not(.vs-bot) .status.you::before, body:not(.vs-bot) .status.win::before, body:not(.vs-bot) .status.lose::before { float: left; width: 26px; height: 26px; margin: -4px 4px -4px 0; }
     body:not(.vs-bot) .status.you::before { -webkit-mask-position: 87.5% 0; mask-position: 87.5% 0; }
@@ -317,6 +337,22 @@
   .fs-pip.hit { background: var(--fire); box-shadow: 0 0 6px rgba(255,91,81,.55); }
   .fs-ship.sunk { opacity: .4; border-color: rgba(255,91,81,.6); }
   .fs-ship.sunk .fs-pip { background: var(--fire); box-shadow: none; }
+  /* a ship in the tracker is its row of art/fleet.png, 11px to the cell; sunk, it turns
+     into a coral silhouette (the picture's own outline used as a mask) */
+  .fs-ship.art { display: block; padding: 0; border: 0; border-radius: 0; background: none; }
+  .fs-pic { display: block; height: var(--fs-cell, 11px); background: url(art/fleet.png) no-repeat; }
+  @media (max-width: 359px) { .fleet-strip { --fs-cell: 9px; gap: 4px; } } /* keeps five ships on one line */
+  .fs-bar { display: block; height: 2px; margin-top: 2px; border-radius: 1px; background: rgba(207,233,236,.16); overflow: hidden; }
+  .fs-bar i { display: block; height: 100%; background: var(--fire); }
+  .fs-ship.art.sunk { opacity: 1; }
+  .fs-ship.art.sunk .fs-pic { opacity: .4; }
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .fs-ship.art.sunk .fs-pic {
+      background: var(--fire); opacity: .75;
+      -webkit-mask-image: url(art/fleet.png); mask-image: url(art/fleet.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    }
+  }
 
   /* bottom dock */
   .battle-dock { display: flex; gap: 8px; align-items: stretch; flex: none; }
@@ -327,6 +363,20 @@
   /* player crosshair (green variant of battle-aim) */
   .battle-aim.player { border-color: var(--sonar); filter: drop-shadow(0 0 8px rgba(52,231,196,.9)); transition: transform .14s cubic-bezier(.2,.8,.2,1), width .14s ease, height .14s ease; }
   .battle-aim.player::before, .battle-aim.player::after { background: var(--sonar); box-shadow: 0 0 8px rgba(52,231,196,.7); }
+  /* the crosshair is the aim stamp from art/markers.png; its glow is the parent's filter,
+     which a mask on the same element would cut away */
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .battle-aim, .battle-aim.player { border-color: transparent; }
+    .battle-aim::after, .battle-aim.player::after { display: none; }
+    .battle-aim::before, .battle-aim.player::before {
+      left: -18%; top: -18%; width: 136%; height: 136%; transform: none; box-shadow: none; background: var(--fire);
+      -webkit-mask-image: url(art/markers.png); mask-image: url(art/markers.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 900% 100%; mask-size: 900% 100%;
+      -webkit-mask-position: 37.5% 0; mask-position: 37.5% 0;
+    }
+    .battle-aim.player::before { background: var(--sonar); }
+  }
 
   /* shot effects */
   .shell-tracer {

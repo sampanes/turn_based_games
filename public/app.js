@@ -988,6 +988,9 @@ function shipArtMap(ships) {
 function paintShipArt(cell, position) {
   cell.classList.toggle('shipart', !!position);
   cell.style.backgroundPosition = position || '';
+  // the same position again for the mask that draws a sunk ship's outline
+  if (position) cell.style.setProperty('--ship-at', position);
+  else cell.style.removeProperty('--ship-at');
 }
 
 function renderFleetList() {
@@ -1477,12 +1480,25 @@ function shotFx(grid, r, c, result, sunkCells) {
   battleVibrate(sunkCells ? [0, 80, 60, 140] : result === 'hit' ? [0, 70] : 25);
 }
 
+// Fleet tracker: each ship as its small picture. Your own ships carry a damage bar
+// underneath; an enemy ship only changes when it sinks.
 function renderFleetStrip(el, ships, mine) {
   if (!el) return;
   el.innerHTML = (ships || []).map(s => {
-    const pips = Array.from({ length: s.size }, (_, i) =>
-      `<span class="fs-pip${(s.sunk || (mine && i < (s.hits || 0))) ? ' hit' : ''}"></span>`).join('');
-    return `<span class="fs-ship${s.sunk ? ' sunk' : ''}" title="${s.name}${s.sunk ? ' - sunk' : ''}">${pips}</span>`;
+    const title = `${s.name}${s.sunk ? ' - sunk' : ''}`;
+    const artRow = FLEET_ART_ROW[s.name];
+    if (artRow == null) {
+      const pips = Array.from({ length: s.size }, (_, i) =>
+        `<span class="fs-pip${(s.sunk || (mine && i < (s.hits || 0))) ? ' hit' : ''}"></span>`).join('');
+      return `<span class="fs-ship${s.sunk ? ' sunk' : ''}" title="${title}">${pips}</span>`;
+    }
+    const size = `${1000 / s.size}% 500%`;
+    const at = `0 ${artRow * 25}%`;
+    const hits = s.sunk ? s.size : Math.min(s.size, s.hits || 0);
+    const bar = mine ? `<span class="fs-bar"><i style="width:${hits / s.size * 100}%"></i></span>` : '';
+    return `<span class="fs-ship art${s.sunk ? ' sunk' : ''}" title="${title}">`
+      + `<span class="fs-pic" style="width:calc(var(--fs-cell, 11px) * ${s.size});background-size:${size};background-position:${at};`
+      + `-webkit-mask-size:${size};mask-size:${size};-webkit-mask-position:${at};mask-position:${at}"></span>${bar}</span>`;
   }).join('');
 }
 
@@ -1569,7 +1585,8 @@ function renderBattle(d, v) {
     if (!val && enemyRevealCells.has(key)) cls += ' reveal-ship';
     if (!hidden && shot && shot.by === d.you && shot.r === r && shot.c === c) cls += ' last-shot outgoing-shot';
     cell.className = cls;
-    paintShipArt(cell, !val && enemyRevealCells.has(key) && enemyArt.get(key));
+    // a sunk enemy ship shows itself; at the end the ships never found do too
+    paintShipArt(cell, (val === 'hit' ? enemySunkCells.has(key) : !val && enemyRevealCells.has(key)) && enemyArt.get(key));
     cell.setAttribute('aria-label', val ? `Your ${val} at ${coordLabel(r, c)}` : `Aim at ${coordLabel(r, c)}`);
   });
   // my fleet grid, with enemy shots shown
@@ -1587,7 +1604,7 @@ function renderBattle(d, v) {
     if (sq.shot === 'hit' && mySunkCells.has(key)) cls += ' sunk-ship';
     if (!hideShot && shot && shot.by !== d.you && shot.r === r && shot.c === c) cls += ' last-shot incoming-shot';
     cell.className = cls;
-    paintShipArt(cell, !sq.shot && sq.ship && myArt.get(key));
+    paintShipArt(cell, sq.ship && myArt.get(key)); // a hit leaves the ship in view under its mark
     const shipText = sq.ship ? 'ship' : 'water';
     cell.setAttribute('aria-label', sq.shot ? `Opponent ${sq.shot} on your ${shipText} at ${coordLabel(r, c)}` : `Your ${shipText} at ${coordLabel(r, c)}`);
   });
