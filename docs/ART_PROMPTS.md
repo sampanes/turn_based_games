@@ -43,6 +43,11 @@ Skip, reverse, draw and wild cards show their stamp in white; +2 and +4 keep the
 as text under it, and the corners keep the words. The tilted oval ring is gone from
 every card; a plain round medallion sits behind the number or the stamp.
 
+Sheet 7b is done: `art/sheets/07b-card-back.png` (kept at half size), baked to
+`public/art/cardback.png`. The bake drops the painted border, cuts the field to 5 : 7
+around the medallion and snaps it to the inks; the page draws the border and corners.
+It is the draw pile and the back of a card in flight.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |

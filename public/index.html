@@ -1101,13 +1101,21 @@
   .uno-mid { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .uno-dir { font-weight: 900; letter-spacing: 3px; color: var(--sonar); font-size: 17px; }
   .uno-last { min-height: 18px; text-align: center; color: var(--mute); font-size: 12px; padding: 0 10px; }
+  /* The draw pile is the card back (art/cardback.png, six flat colors); the count rides in a
+     pill at the foot of the card so the medallion stays clear. */
   button.uno-deck {
-    background: linear-gradient(145deg, #142d3a, #06141b); color: var(--sonar);
+    background: #06141b url(art/cardback.png) center / cover no-repeat; color: var(--sonar);
+    border-color: rgba(207,233,236,.7); justify-content: flex-end;
     padding: 8px; min-height: 0; cursor: default;
   }
+  button.uno-deck::after, .uno-fly.uno-back::after { display: none; }
   button.uno-deck:not(:disabled) { cursor: pointer; border-color: var(--sonar); box-shadow: inset 0 0 0 5px rgba(255,255,255,.1), 0 0 18px rgba(52,231,196,.25); }
   button.uno-deck:not(:disabled):active { transform: scale(.95); }
-  button.uno-deck span { color: var(--sonar); }
+  button.uno-deck span {
+    color: var(--sonar); font-size: clamp(15px, 5vw, 20px); min-width: 2.6em; padding: 3px 9px;
+    border-radius: 999px; background: rgba(6,20,27,.92); box-shadow: 0 0 0 1px rgba(52,231,196,.45);
+  }
+  button.uno-deck small { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
   /* card faces */
   .one-card-card { position: relative; aspect-ratio: 5 / 7; border-radius: 16px; border: 2px solid rgba(255,255,255,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #fff; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.45); box-shadow: inset 0 0 0 4px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); overflow: hidden; }
@@ -1192,7 +1200,7 @@
     transition: left .34s cubic-bezier(.3,.7,.35,1), top .34s cubic-bezier(.3,.7,.35,1), transform .34s ease;
   }
   .uno-fly span { font-size: 22px; }
-  .uno-fly.uno-back { background: linear-gradient(145deg, #142d3a, #06141b); color: var(--sonar); }
+  .uno-fly.uno-back { background: #06141b url(art/cardback.png) center / cover no-repeat; color: var(--ink); text-shadow: 0 1px 4px #06141b, 0 0 8px #06141b; }
 
   /* wild color picker overlay */
   .uno-color-pick {

@@ -12,7 +12,8 @@ color comes from the page, not from the file.
 
 A picture sheet is flat color on a transparent background. Every pixel is
 snapped to the nearest ink below, so the baked file holds at most eight
-colors whatever the generator painted.
+colors whatever the generator painted. A card back is a picture with no
+transparency.
 """
 import io
 import os
@@ -111,6 +112,16 @@ PICTURES = {
         # Keep only the top of each cell (head and neck), as a share of the
         # cell's inked height. The shoulders are dark and vanish on the page.
         "keep": 0.8,
+    },
+}
+# A card back fills its sheet. The page draws the card's own border and round
+# corners, so the bake drops the painted border, cuts the field to the card's
+# shape around its center and snaps it to the inks.
+CARDS = {
+    "cardback.png": {
+        "sheet": "07b-card-back.png",
+        "size": (200, 280),           # baked pixels, 5 : 7; shown 58 to 118 CSS px wide
+        "border": (0xCF, 0xE9, 0xEC),  # the ink the painted border snaps to
     },
 }
 
@@ -250,6 +261,47 @@ def bake_pictures(spec):
     return buffer.getvalue()
 
 
+def border_run(strip, ink):
+    """Index just past the first run of `ink` in a 1-pixel strip of palette indexes."""
+    values = list(strip.tobytes())
+    start = values.index(ink)
+    end = start
+    while end < len(values) and values[end] == ink:
+        end += 1
+    return end
+
+
+def bake_card(spec):
+    sheet = Image.open(os.path.join(SHEETS, spec["sheet"])).convert("RGB")
+    width, height = sheet.size
+    snapped = sheet.quantize(palette=ink_palette(), dither=Image.NONE)
+    ink = INKS.index(spec["border"])
+    # Walk in from each edge a quarter of the way along it, clear of the
+    # medallion, to find where the painted border ends.
+    row = snapped.crop((0, height // 4, width, height // 4 + 1))
+    column = snapped.crop((width // 4, 0, width // 4 + 1, height))
+    left = border_run(row, ink)
+    right = width - border_run(row.transpose(Image.FLIP_LEFT_RIGHT), ink)
+    top = border_run(column, ink)
+    bottom = height - border_run(column.transpose(Image.FLIP_TOP_BOTTOM), ink)
+    pad = 4  # soft pixels where the border meets the field
+    left, top, right, bottom = left + pad, top + pad, right - pad, bottom - pad
+    out_w, out_h = spec["size"]
+    keep_h = round((right - left) * out_h / out_w)
+    if keep_h > bottom - top:
+        raise SystemExit(f"{spec['sheet']}: field is too short for the card shape")
+    middle = (top + bottom) // 2
+    field = sheet.crop((left, middle - keep_h // 2, right, middle - keep_h // 2 + keep_h))
+    small = field.resize((out_w, out_h), Image.LANCZOS)
+    baked = small.quantize(palette=ink_palette(), dither=Image.NONE)
+    # The palette is padded with black past the inks; fold any such pixel
+    # back onto the darkest ink.
+    baked = baked.point(lambda p: p if p < len(INKS) else 0)
+    buffer = io.BytesIO()
+    baked.save(buffer, "PNG", optimize=True, bits=4)
+    return buffer.getvalue()
+
+
 def main():
     check = "--check" in sys.argv[1:]
     stale = []
@@ -257,6 +309,7 @@ def main():
     jobs = [(name, bake_stamps, spec) for name, spec in STAMPS.items()]
     jobs += [(name, bake_fleet, spec) for name, spec in FLEET.items()]
     jobs += [(name, bake_pictures, spec) for name, spec in PICTURES.items()]
+    jobs += [(name, bake_card, spec) for name, spec in CARDS.items()]
     for name, bake, spec in jobs:
         data = bake(spec)
         path = os.path.join(OUT, name)
