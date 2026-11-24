@@ -10,13 +10,14 @@ targets.
 | Game | Notes |
 | --- | --- |
 | Dots and Boxes | Added as a 2-player 4x4-box board with Botty support, server persistence, edge claiming, scoring, and extra turns on completed boxes. |
+| Reversi | Added as a 2-player 8x8 board: legal squares are marked, trapped discs flip, a player with no square misses the turn. |
+| Checkers | Added as American checkers: forced jumps, the same piece keeps jumping, kings, a draw after forty quiet moves each. The second player sees the board turned around. |
+| Pig | Not on this list when it was built. Two dice, 2 to 4 players, bank or roll again, first to 100. |
 
 ## Best Next Candidates
 
 | Game | Players | Why it fits | Implementation notes |
 | --- | ---: | --- | --- |
-| Reversi | 2 | Small 8x8 board, simple turns, strong visual flips, good Botty search. | Use standard legal-move generation and a lightweight minimax/heuristic bot. |
-| Checkers | 2 | Familiar, readable on mobile, good animations for captures and kings. | Enforce forced captures; consider American checkers first. |
 | Gomoku | 2 | Easy rules, larger strategy than Connect Four, minimal UI surface. | Use a 15x15 or scalable board; add win/block Botty heuristic. |
 | Mastermind-style Codebreaker | 2 or solo | Asymmetric roles, compact state, works well against Botty. | One player sets a code, the other guesses; Botty can set or solve. |
 | Draw Dominoes | 2-4 | Good family/table feel, shared boneyard, manageable rules. | Start with draw dominoes before scoring-heavy variants. |
@@ -57,11 +58,9 @@ targets.
 
 ## Suggested Build Order
 
-1. Reversi
-2. Checkers
-3. Gomoku
-4. Draw Dominoes
-5. Gin Rummy
+1. Gomoku
+2. Draw Dominoes
+3. Gin Rummy
 
 This order prioritizes games that reuse existing board-rendering and Botty patterns
 before adding heavier hidden-hand and scoring systems.

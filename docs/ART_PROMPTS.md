@@ -62,6 +62,12 @@ the crosshair is the aim stamp. Botty looks surprised at a draw and falls asleep
 seconds of waiting; a draw with a friend shows the crossed flags. One Card chips carry the
 player sigils. Still unused: the sunk stamp. Still not done: sigils on saved rows.
 
+The three games added next reuse what was there. Reversi and Checkers take cells 7 and 8
+of sheet 1 for their emblems, and their pieces are the Connect Four disc with the player
+sigil pressed in. A Checkers king wears the crown from emblem 8, which the bake lifts out
+on its own as `public/art/crown.png` (`PARTS` in the bake script). Pig is waiting on
+sheet 9: until it is made, the page draws the dice and the Pig emblem itself.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |
@@ -74,6 +80,7 @@ player sigils. Still unused: the sunk stamp. Still not done: sigils on saved row
 | 6 | Player sigils | stamp | Dots and Boxes claimed boxes, Connect Four disc faces, One Card seat chips, saved rows |
 | 7 | Card symbols and card back | stamp + picture | One Card faces are a gradient with a tilted oval ring and text; there is no card back art |
 | 8 | Home scene | picture | The bottom half of the home screen is empty |
+| 9 | Dice | stamp | Pig's dice and its home-screen emblem are drawn by the page |
 
 Leave alone: the Mancala board and stones, the Connect Four board, and the app icon.
 They already look good, and art there would add bytes for little gain.
@@ -129,7 +136,7 @@ Inks (all already in the page CSS):
 
 ## Style block: stamps
 
-Paste above the prompt for sheets 1, 3, 4, 5, 6 and 7a.
+Paste above the prompt for sheets 1, 3, 4, 5, 6, 7a and 9.
 
 ```text
 STYLE: a sheet of bold rubber-stamp icons. Solid pure black shapes on a pure white background. Two tones only, black and white. No gray, no gradients, no shading, no texture, no thin outline drawings, no text, no letters, no numbers. Chunky rounded shapes with a hand-cut feel, like linocut prints or paper cut-outs. Detail is made by leaving white gaps inside the black shape, never by thin lines. Every gap and every stroke is thick enough to survive shrinking the icon to 24 pixels. Friendly and a little playful, never aggressive. Each icon sits centered in its own invisible square cell with wide empty margins. Icons never touch or overlap. All icons have the same visual weight and fill the same share of their cell.
@@ -284,4 +291,25 @@ Right of center, Botty the robot from the attached sheet bobs in the water like 
 On the far right, a tiny folded paper boat in cream.
 
 A few small cream stars, drawn as simple four-pointed shapes. No moon, no clouds, no fading or soft edges anywhere.
+```
+
+## 9. Dice (stamp, 3 x 3)
+
+For Pig. The one face is the pig, since rolling it loses the pot. Dice show at 68 to 104
+px, the piggy bank and the pig's head beside the buttons and the last-roll line, and
+cell 9 is the game's emblem (pasted into cell 9 of sheet 1, over the five-in-a-row
+emblem nothing uses). Attach sheet 1 as the style reference. Check the pip counts before
+accepting the sheet; a wrong face can be rebuilt in the bake from the pips of a good one.
+
+```text
+A 3 by 3 grid of nine icons, one per cell, reading left to right, top to bottom. Cells 1 to 6 are the six faces of one chunky toy die, each seen flat from the front: a solid black square with generously rounded corners, the same size in every cell. The marks on each face are white cut-outs.
+1. The one face, which in this game is a pig: instead of a pip, one big white oval pig snout in the middle of the face, with two solid black nostrils inside the oval.
+2. Exactly two round white pips, on one diagonal.
+3. Exactly three round white pips, in a diagonal line.
+4. Exactly four round white pips, one near each corner.
+5. Exactly five round white pips, one near each corner and one in the center.
+6. Exactly six round white pips, in two columns of three.
+7. A round piggy bank seen from the side, with a coin dropping into the slot on its back.
+8. A cheeky pig's head seen from the front: round, floppy ears, a big snout, and its tongue sticking out.
+9. Two chunky dice tumbling, one tilted and overlapping the other, showing three pips and five pips.
 ```

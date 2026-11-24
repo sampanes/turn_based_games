@@ -17,6 +17,9 @@ localhost and be shared privately through a network layer such as Tailscale Serv
 - Mancala
 - Ultimate Tic-Tac-Toe
 - One Card, a color-and-number shedding game for two to four players
+- Reversi
+- Checkers, with forced jumps
+- Pig, a two-dice push-your-luck game for two to four players
 
 Future game ideas are tracked in [GAME_CANDIDATES.md](GAME_CANDIDATES.md).
 
@@ -86,9 +89,14 @@ Games saved before levels existed play at Normal.
 | Mancala | half random | two moves ahead | six moves ahead |
 | One Card | random legal card | first legal card | holds wilds, attacks a player about to go out |
 | Ultimate Tic-Tac-Toe | takes wins, otherwise random | wins and blocks boards | neural net on GitHub Pages; elsewhere also avoids handing you a board |
+| Reversi | half random, otherwise most flips | weighs the squares, two moves ahead | four moves ahead, plays out the last eight squares |
+| Checkers | half random | three moves ahead | six moves ahead |
+| Pig | banks at 8 | banks at 13 | banks around 23, rolls for the win when anybody is close |
 
 Measured bot against bot (200 games per pairing for Battleship and Mancala, 40 for the
-rest, seats alternating), each level beats the one below it in every game; in One Card luck keeps it close.
+rest, seats alternating), each level beats the one below it in every game; in One Card
+and Pig luck keeps it close (over 20,000 games of Pig, Normal beat Easy 63% of the time
+and Hard beat Normal 55%).
 
 ## Local Multiplayer
 
@@ -195,8 +203,8 @@ syntax, including `autogroup:shared` (https://tailscale.com/kb/1337/policy-synta
 ## Multiplayer Behavior
 
 A player creates a room and shares its four-character code with another permitted
-player. Most games are two-player; One Card supports up to four players before the
-host starts the hand.
+player. Most games are two-player; One Card and Pig take up to four players before the
+host starts the game.
 
 **Play the computer** creates a normal authenticated server room with Botty already
 seated. Botty uses the same shared computer-move hooks as offline play, waits
@@ -294,6 +302,7 @@ Configuration can be adjusted with environment variables:
 The smoke test starts an isolated localhost server on a temporary port and exercises
 static serving, traversal protection, request-size limits, bearer authentication,
 Battleship setup and moves, Connect Four, Mancala move identity, the One Card lobby,
+Reversi flips and passes, Checkers jumps and kings, Pig pots and pigs,
 Botty availability in every game, and Botty persistence across a server restart.
 
 ```bash
