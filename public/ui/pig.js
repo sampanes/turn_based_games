@@ -126,6 +126,7 @@ function renderPig(d, v) {
   $('pigPot').textContent = v.pot || 0;
   $('pigPotLabel').textContent = lobby || over ? 'Pot' : v.isMyTurn ? 'Your pot' : `${turnName}'s pot`;
   $('pigLast').textContent = pigLastText(v, d);
+  $('pigLast').classList.toggle('bust', bust);
 
   const wins = v.isMyTurn && me.score + (v.pot || 0) >= (v.target || 100);
   const roll = $('pigRoll');
@@ -133,7 +134,7 @@ function renderPig(d, v) {
   roll.disabled = !v.isMyTurn;
   roll.textContent = v.pot ? 'Roll again' : 'Roll';
   bank.disabled = !v.canBank;
-  bank.textContent = wins ? 'Bank to win' : v.canBank ? `Bank ${v.pot}` : 'Bank';
+  bank.textContent = wins ? 'Bank & win' : v.canBank ? `Bank ${v.pot}` : 'Bank';
   bank.classList.toggle('wins', wins);
 
   const banner = $('pigStatus');

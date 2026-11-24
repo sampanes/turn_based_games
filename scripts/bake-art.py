@@ -48,6 +48,19 @@ STAMPS = {
         "rows": 3,
         "cell": 128,      # baked pixels per side; shown at 24 to 48 CSS px
         "margin": 0.04,   # empty border inside each baked cell
+        # Cell 9 was drawn for a game that was never built; Pig's emblem
+        # (cell 9 of the dice sheet) takes its place.
+        "swap": {8: {"sheet": "09-dice.png", "cols": 3, "rows": 3, "index": 8}},
+    },
+    # the six faces of a die (the one is a pig's snout), a piggy bank, a
+    # pig's head; the ninth cell of the sheet is Pig's emblem, used above
+    "dice.png": {
+        "sheet": "09-dice.png",
+        "cols": 3,
+        "rows": 3,
+        "count": 8,
+        "cell": 176,      # shown at 20 to 104 CSS px
+        "margin": 0.02,
     },
     # hit, miss, sunk, aim, win, lose, draw, your turn, invite
     "markers.png": {
@@ -183,9 +196,13 @@ def cells(sheet, cols, rows):
 def bake_stamps(spec):
     sheet = Image.open(os.path.join(SHEETS, spec["sheet"]))
     cols, rows, cell = spec["cols"], spec["rows"], spec["cell"]
-    strip = Image.new("L", (cell * cols * rows, cell), 0)
+    pieces = list(cells(sheet, cols, rows))[:spec.get("count", cols * rows)]
+    for index, other in spec.get("swap", {}).items():
+        donor = Image.open(os.path.join(SHEETS, other["sheet"]))
+        pieces[index] = list(cells(donor, other["cols"], other["rows"]))[other["index"]]
+    strip = Image.new("L", (cell * len(pieces), cell), 0)
     inner = round(cell * (1 - 2 * spec["margin"]))
-    for index, piece in enumerate(cells(sheet, cols, rows)):
+    for index, piece in enumerate(pieces):
         ink = knockout_mask(piece) if spec.get("knockout") else ink_mask(piece)
         bounds = ink.getbbox()
         if not bounds:

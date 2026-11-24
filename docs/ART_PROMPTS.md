@@ -65,8 +65,15 @@ player sigils. Still unused: the sunk stamp. Still not done: sigils on saved row
 The three games added next reuse what was there. Reversi and Checkers take cells 7 and 8
 of sheet 1 for their emblems, and their pieces are the Connect Four disc with the player
 sigil pressed in. A Checkers king wears the crown from emblem 8, which the bake lifts out
-on its own as `public/art/crown.png` (`PARTS` in the bake script). Pig is waiting on
-sheet 9: until it is made, the page draws the dice and the Pig emblem itself.
+on its own as `public/art/crown.png` (`PARTS` in the bake script).
+
+Sheet 9 is done: `art/sheets/09-dice.png`, baked to `public/art/dice.png` (the six faces,
+the piggy bank, the pig's head). All six pip counts came back right. The face is a mask
+over a dark backing, so the pips are solid and the die can carry a hard shadow for its
+thickness. The piggy bank rides on the Bank button and the pig's head on the line that
+reports a pig. Cell 9, the two dice, is Pig's emblem: the bake swaps it into cell 9 of
+`emblems.png` in place of the five-in-a-row emblem (`swap` in the recipe), so sheet 1
+itself is untouched. A browser without masks still gets the dice the page draws.
 
 ## Where art pays, in order
 
@@ -80,7 +87,7 @@ sheet 9: until it is made, the page draws the dice and the Pig emblem itself.
 | 6 | Player sigils | stamp | Dots and Boxes claimed boxes, Connect Four disc faces, One Card seat chips, saved rows |
 | 7 | Card symbols and card back | stamp + picture | One Card faces are a gradient with a tilted oval ring and text; there is no card back art |
 | 8 | Home scene | picture | The bottom half of the home screen is empty |
-| 9 | Dice | stamp | Pig's dice and its home-screen emblem are drawn by the page |
+| 9 | Dice | stamp | Pig's dice and its home-screen emblem were drawn by the page |
 
 Leave alone: the Mancala board and stones, the Connect Four board, and the app icon.
 They already look good, and art there would add bytes for little gain.
@@ -296,10 +303,10 @@ A few small cream stars, drawn as simple four-pointed shapes. No moon, no clouds
 ## 9. Dice (stamp, 3 x 3)
 
 For Pig. The one face is the pig, since rolling it loses the pot. Dice show at 68 to 104
-px, the piggy bank and the pig's head beside the buttons and the last-roll line, and
-cell 9 is the game's emblem (pasted into cell 9 of sheet 1, over the five-in-a-row
-emblem nothing uses). Attach sheet 1 as the style reference. Check the pip counts before
-accepting the sheet; a wrong face can be rebuilt in the bake from the pips of a good one.
+px, the piggy bank and the pig's head beside the Bank button and the last-roll line, and
+cell 9 is the game's emblem. Attach sheet 1 as the style reference. Check the pip counts
+before accepting a sheet; a wrong face can be rebuilt in the bake from the pips of a
+good one.
 
 ```text
 A 3 by 3 grid of nine icons, one per cell, reading left to right, top to bottom. Cells 1 to 6 are the six faces of one chunky toy die, each seen flat from the front: a solid black square with generously rounded corners, the same size in every cell. The marks on each face are white cut-outs.
