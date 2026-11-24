@@ -18,6 +18,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const games = require('./server/games');
 const push = require('./server/push');
 
@@ -395,13 +396,46 @@ function serveStatic(req, res) {
     res.writeHead(403);
     return res.end('Forbidden');
   }
-  fs.readFile(filePath, (err, data) => {
+  loadStatic(filePath, (err, file) => {
     if (err) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, {
+    const headers = {
       ...STATIC_SECURITY_HEADERS,
       'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream',
+      ETag: file.etag,
+    };
+    if (file.gzip) headers.Vary = 'Accept-Encoding';
+    // The browser still asks every time (no-cache); an unchanged file costs it no download.
+    if (req.headers['if-none-match'] === file.etag) { res.writeHead(304, headers); return res.end(); }
+    if (file.gzip && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+      res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip' });
+      return res.end(file.gzip);
+    }
+    res.writeHead(200, headers);
+    res.end(file.data);
+  });
+}
+
+// Static files are read and compressed once, then kept until the file changes on disk.
+// Text shrinks to about a quarter, which is most of the wait on a slow phone connection.
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.json', '.svg', '.webmanifest']);
+const staticFiles = new Map();
+function loadStatic(filePath, done) {
+  fs.stat(filePath, (statErr, stat) => {
+    if (statErr || !stat.isFile()) return done(statErr || new Error('Not a file'));
+    const kept = staticFiles.get(filePath);
+    if (kept && kept.mtimeMs === stat.mtimeMs && kept.size === stat.size) return done(null, kept);
+    fs.readFile(filePath, (readErr, data) => {
+      if (readErr) return done(readErr);
+      const file = {
+        mtimeMs: stat.mtimeMs,
+        size: stat.size,
+        data,
+        etag: `W/"${crypto.createHash('sha1').update(data).digest('hex').slice(0, 20)}"`,
+        gzip: COMPRESSIBLE.has(path.extname(filePath)) ? zlib.gzipSync(data, { level: 9 }) : null,
+      };
+      staticFiles.set(filePath, file);
+      done(null, file);
     });
-    res.end(data);
   });
 }
 

@@ -5,10 +5,21 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const root = path.resolve(__dirname, '..');
 const dataFile = path.join(os.tmpdir(), `turn-based-games-smoke-${process.pid}.json`);
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+function requestBytes(port, pathname, headers) {
+  return new Promise((resolve, reject) => {
+    http.get({ hostname: '127.0.0.1', port, path: pathname, headers }, res => {
+      const chunks = [];
+      res.on('data', chunk => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+    }).on('error', reject);
+  });
+}
 
 function request(port, method, pathname, body, headers = {}) {
   const payload = body ? JSON.stringify(body) : null;
@@ -344,6 +355,23 @@ async function main() {
 
     const traversal = await request(port, 'GET', '/..%2Fpackage.json', null);
     assert.strictEqual(traversal.status, 403);
+
+    // Static files: compressed when the browser accepts it, and not sent again when unchanged.
+    assert.ok(page.headers.etag, 'static files carry an ETag');
+    assert.strictEqual(page.headers['content-encoding'], undefined);
+    const zipped = await requestBytes(port, '/app.js', { 'Accept-Encoding': 'gzip, deflate' });
+    assert.strictEqual(zipped.headers['content-encoding'], 'gzip');
+    assert.strictEqual(zipped.headers.vary, 'Accept-Encoding');
+    const appSource = fs.readFileSync(path.join(root, 'public', 'app.js'));
+    assert.ok(zipped.body.length < appSource.length / 2, 'app.js is sent compressed');
+    assert.ok(zlib.gunzipSync(zipped.body).equals(appSource), 'the compressed copy unpacks to the file');
+    const unchanged = await requestBytes(port, '/app.js', { 'If-None-Match': zipped.headers.etag });
+    assert.strictEqual(unchanged.status, 304);
+    assert.strictEqual(unchanged.body.length, 0);
+    const picture = await requestBytes(port, '/art/home.png', { 'Accept-Encoding': 'gzip' });
+    assert.strictEqual(picture.headers['content-encoding'], undefined);
+    assert.ok(picture.body.equals(fs.readFileSync(path.join(root, 'public', 'art', 'home.png'))));
+    assert.strictEqual((await requestBytes(port, '/games', {})).status, 404);
 
     await testTurnAlerts(port, fakePush);
 
