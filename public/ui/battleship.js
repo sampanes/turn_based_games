@@ -553,7 +553,10 @@ function renderBattle(d, v) {
         battleShellAnimation = null;
         pendingOutgoing = null;
         battleIncomingHoldUntil = Date.now() + 900;
-        if (lastView) renderBattle(d, lastView);
+        // The player may have gone Home, or into another game, while the shell was in the
+        // air; lastView is then missing or belongs to that other game.
+        if (!lastView || !lastView.firingBoard) return;
+        renderBattle(d, lastView);
         shotFx($('fireGrid'), r, c, result, sunkShip ? sunkShip.cells : null);
         if (sunkShip && lastView && lastView.phase !== 'over') toast(`Enemy ${sunkShip.name} destroyed!`);
       });
