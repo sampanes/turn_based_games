@@ -38,6 +38,11 @@ seat takes its sigil from the player's name. In use: claimed boxes and the name 
 Dots and Boxes, and the disc faces in Connect Four. Not yet: One Card seat chips, saved
 rows.
 
+Sheet 7a is done: `art/sheets/07a-card-symbols.png`, baked to `public/art/cards.png`.
+Skip, reverse, draw and wild cards show their stamp in white; +2 and +4 keep the count
+as text under it, and the corners keep the words. The tilted oval ring is gone from
+every card; a plain round medallion sits behind the number or the stamp.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |

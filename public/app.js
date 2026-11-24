@@ -2614,10 +2614,15 @@ function unoSfx(kind) {
   }
 }
 
+// Cells of art/cards.png. A draw card keeps its count as text under the stamp.
+const UNO_STAMP = { skip: 0, reverse: 1, draw2: 2, wild: 3, wild4: 3 };
 function unoCardFaceHTML(card) {
   const label = oneCardLabel(card);
-  const sm = label.length > 2 ? ' class="sm"' : '';
-  return `<span${sm}>${label}</span>`;
+  const stamp = card ? UNO_STAMP[card.kind] : undefined;
+  if (stamp == null) return `<span${label.length > 2 ? ' class="sm"' : ''}>${label}</span>`;
+  const count = card.kind === 'draw2' || card.kind === 'wild4';
+  return `<i class="card-stamp s${stamp}" aria-hidden="true"></i>`
+    + `<span class="${count ? 'count' : 'word' + (label.length > 2 ? ' sm' : '')}">${label}</span>`;
 }
 function unoSetDiscard(top, color) {
   const discard = $('oneCardDiscard');

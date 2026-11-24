@@ -76,6 +76,15 @@ STAMPS = {
         # Keep the figure and drop the disc.
         "knockout": True,
     },
+    # skip (leaping fish), reverse (two arrows), draw (two cards and a plus),
+    # wild (a compass star in four quarters)
+    "cards.png": {
+        "sheet": "07a-card-symbols.png",
+        "cols": 2,
+        "rows": 2,
+        "cell": 160,      # shown at 30 to 70 CSS px
+        "margin": 0.03,
+    },
 }
 # Ships are not on a grid: each is one band of ink, top to bottom, bow to
 # the right. Baked as a 10 x 5 block of square cells: the left 5 x 5 holds

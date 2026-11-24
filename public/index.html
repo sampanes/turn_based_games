@@ -1113,7 +1113,26 @@
   .one-card-card { position: relative; aspect-ratio: 5 / 7; border-radius: 16px; border: 2px solid rgba(255,255,255,.28); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: #fff; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,.45); box-shadow: inset 0 0 0 4px rgba(255,255,255,.14), 0 12px 26px rgba(0,0,0,.32); overflow: hidden; }
   .one-card-card span { font-size: clamp(20px, 8vw, 38px); line-height: 1; }
   .one-card-card span.sm { font-size: clamp(13px, 4.5vw, 21px); letter-spacing: 1px; }
-  .one-card-card::after { content: ""; position: absolute; inset: 18% 16%; border: 2px solid rgba(255,255,255,.24); border-radius: 50%; transform: rotate(-18deg); }
+  /* a plain round medallion behind the number or the stamp */
+  .one-card-card::after { content: ""; position: absolute; left: 12%; top: 50%; width: 76%; aspect-ratio: 1; border-radius: 50%; background: rgba(255,255,255,.13); transform: translateY(-50%); }
+  /* card stamps: art/cards.png is a strip of four 1-bit stamps (skip, reverse, draw, wild),
+     shown in white on the card color. Without mask support the word shows instead. */
+  .card-stamp { display: none; }
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .card-stamp {
+      display: block; flex: none; width: 58%; aspect-ratio: 1; background: currentColor;
+      filter: drop-shadow(0 2px 3px rgba(0,0,0,.3));
+      -webkit-mask-image: url(art/cards.png); mask-image: url(art/cards.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 400% 100%; mask-size: 400% 100%;
+      -webkit-mask-position: 0 0; mask-position: 0 0;
+    }
+    .card-stamp.s1 { -webkit-mask-position: 33.3333% 0; mask-position: 33.3333% 0; }
+    .card-stamp.s2 { -webkit-mask-position: 66.6667% 0; mask-position: 66.6667% 0; }
+    .card-stamp.s3 { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+    .one-card-card .card-stamp ~ span.word { display: none; }
+    .one-card-card .card-stamp ~ span.count { font-size: clamp(13px, 4.6vw, 20px); margin-top: -4px; }
+  }
   .one-card-card > * { position: relative; z-index: 1; }
   .one-card-card .corner { position: absolute; font-size: 10px; letter-spacing: .5px; }
   .one-card-card .corner.top { top: 8px; left: 9px; }
