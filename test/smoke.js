@@ -6,10 +6,49 @@ const path = require('path');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const zlib = require('zlib');
+const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const dataFile = path.join(os.tmpdir(), `turn-based-games-smoke-${process.pid}.json`);
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+
+// The page loads a game's rules and screen only when the game is opened. That holds
+// together only if the home screen's list matches the games, every game has both files,
+// and the always-loaded code never reaches into a file that may not be there yet.
+function testGameCodeOnDemand(pageHtml) {
+  const pub = path.join(root, 'public');
+  const read = file => fs.readFileSync(path.join(pub, file), 'utf8');
+  const fakeWindow = {};
+  vm.runInNewContext(read('games/registry.js'), { window: fakeWindow });
+  const listed = JSON.parse(JSON.stringify(fakeWindow.TurnBasedGamesRegistry.listGames())); // plain copies, out of the vm's realm
+  const ruleFiles = fs.readdirSync(path.join(pub, 'games')).filter(f => f !== 'registry.js').map(f => f.replace(/\.js$/, '')).sort();
+  assert.deepStrictEqual(listed.map(g => g.id).sort(), ruleFiles, 'registry.js lists exactly the games in public/games');
+  const topLevelNames = source => new Set(Array.from(
+    source.matchAll(/^(?:async\s+function\*?|function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm), m => m[1]));
+  const usesName = (source, name) => new RegExp(`(?<![\\w$.'"\`])${name.replace(/\$/g, '\\$')}(?![\\w$'"\`])`).test(source.replace(/\/\/.*$/gm, ''));
+  const screens = {};
+  for (const game of listed) {
+    const own = require(path.join(pub, 'games', `${game.id}.js`)).meta;
+    assert.deepStrictEqual(game, JSON.parse(JSON.stringify(own)), `registry.js matches the ${game.id} file's own details`);
+    assert.doesNotMatch(pageHtml, new RegExp(`<script src="(games|ui)/${game.id}\\.js"`), `${game.id} is not loaded with the page`);
+    screens[game.id] = read(`ui/${game.id}.js`);
+    new vm.Script(screens[game.id], { filename: `ui/${game.id}.js` });
+  }
+  const app = read('app.js');
+  new vm.Script(app, { filename: 'app.js' });
+  // Calls from app.js into a game's screen file. Each is safe only because it runs after
+  // that game has been drawn (render and its key handlers) or is guarded by typeof.
+  const allowed = new Set(['initPlacement', 'renderBattle', 'toggleOrient', 'updateAimUi', 'renderConnectFour', 'connectStepFocus',
+    'connectUi', 'dropConnectDisc', 'renderDotsBoxes', 'renderMancala', 'renderOneCard', 'drawOneCard', 'layoutOneCardFan', 'renderUltimateTTT']);
+  for (const [id, source] of Object.entries(screens)) {
+    for (const name of topLevelNames(source)) {
+      if (!allowed.has(name)) assert.ok(!usesName(app, name), `app.js uses ${name}, which lives in ui/${id}.js and may not be loaded yet`);
+      for (const [otherId, otherSource] of Object.entries(screens)) {
+        if (otherId !== id) assert.ok(!usesName(otherSource, name), `ui/${otherId}.js uses ${name}, which lives in ui/${id}.js`);
+      }
+    }
+  }
+}
 
 function requestBytes(port, pathname, headers) {
   return new Promise((resolve, reject) => {
@@ -352,6 +391,7 @@ async function main() {
     assert.doesNotMatch(page.raw, /fonts\.googleapis|fonts\.gstatic/);
     assert.match(page.headers['content-security-policy'], /default-src 'self'/);
     assert.strictEqual((page.raw.match(/<script src="app\.js"><\/script>/g) || []).length, 1);
+    testGameCodeOnDemand(page.raw);
 
     const traversal = await request(port, 'GET', '/..%2Fpackage.json', null);
     assert.strictEqual(traversal.status, 403);

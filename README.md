@@ -308,10 +308,12 @@ index.html                       GitHub Pages forwarder to public/
 server.js                        local HTTP server, rooms, limits, and persistence
 public/
   index.html                     mobile-first game client (the landing page)
-  app.js                         sessions, polling, animation, sound, and UI state
+  app.js                         what every game shares: sessions, polling, sound, home screen
+  ui/                            one screen file per game, fetched when the game is opened
   solo.js                        browser-local computer-play adapter
   sw.js                          service worker that shows turn alerts
-  games/                         shared browser and server game rules
+  games/                         shared browser and server game rules, fetched the same way
+  games/registry.js              the list of games the home screen shows
 server/games/                    Node wrappers for shared rules
 server/push.js                   zero-dependency Web Push (VAPID + aes128gcm)
 test/smoke.js                    zero-dependency server smoke test
@@ -334,5 +336,11 @@ rules. A shared module under `public/games/` exposes:
 
 Optional computer-play hooks include `computerSetup()`, `computerPlayers()`, and
 `computerMove(state, player, level)`, where `level` is `easy`, `normal` or `hard`.
-Register a new module in both `public/games/registry.js` and `server/games/index.js`, add
-its browser script, and provide the matching UI.
+Register a new module in both `public/games/registry.js` (the list at the bottom, which
+must match the module's own `meta`) and `server/games/index.js`, and provide the matching
+screen as `public/ui/<id>.js`.
+
+The page loads `games/<id>.js` and `ui/<id>.js` only when that game is opened, so the home
+screen stays light. Two rules keep that working, and `npm test` checks both: `app.js` must
+not call into a `ui/` file except through the render functions it already lists, and one
+game's `ui/` file must not use another's. Anything two games share belongs in `app.js`.
