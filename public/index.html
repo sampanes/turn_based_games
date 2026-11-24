@@ -1115,7 +1115,7 @@
           box-shadow: inset 0 6px 16px rgba(0,0,0,.6), 0 0 0 3px var(--sonar), 0 0 22px rgba(52,231,196,.45); }
   }
 
-  /* UNO: fixed full-viewport table, fanned hand pinned above the dock */
+  /* One Card: fixed full-viewport table, fanned hand pinned above the dock */
   body.uno-mode { overflow: hidden; }
   #oneCard.uno-screen {
     position: fixed; inset: 0; z-index: 10;
@@ -1139,6 +1139,18 @@
   .uno-opp .ct { font-size: 19px; font-weight: 800; color: var(--ink); line-height: 1; }
   .uno-opp.active { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 14px rgba(255,179,71,.2); }
   .uno-opp.active .ct { color: var(--amber); }
+  /* each rival's chip shows their sigil beside the count (see player sigils below) */
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .uno-opp .ct::before {
+      content: ""; display: inline-block; width: 15px; height: 15px; margin-right: 5px; vertical-align: -1px; background: var(--mute);
+      -webkit-mask-image: url(art/sigils.png); mask-image: url(art/sigils.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 900% 100%; mask-size: 900% 100%;
+      -webkit-mask-position: var(--sg, 0%) 0; mask-position: var(--sg, 0%) 0;
+    }
+    .uno-opp.active .ct::before { background: var(--amber); }
+    .uno-opp.uno .ct::before { background: var(--fire); }
+  }
   .uno-opp.uno { border-color: var(--fire); animation: unoAlertPulse 1.1s ease-in-out infinite; }
   .uno-opp.uno .ct { color: var(--fire); }
   @keyframes unoAlertPulse { 50% { box-shadow: 0 0 16px rgba(255,91,81,.45); } }
@@ -1627,7 +1639,7 @@
   </section>
 
 
-  <!-- UNO -->
+  <!-- One Card -->
   <section id="oneCard" class="uno-screen hidden">
     <div id="oneCardStatus" class="status">...</div>
     <div class="uno-opponents" id="oneCardOpponents"></div>
@@ -1636,7 +1648,7 @@
         <span class="uno-lobby-label room-share">Invite code</span>
         <strong id="oneCardCode" class="room-share">....</strong>
         <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
-        <button id="oneCardStart" class="primary hidden" onclick="startOneCard()">Start UNO</button>
+        <button id="oneCardStart" class="primary hidden" onclick="startOneCard()">Deal the cards</button>
       </div>
       <div class="uno-center" id="unoCenter">
         <button id="oneCardDeck" class="one-card-card uno-deck" onclick="drawOneCard()" disabled>

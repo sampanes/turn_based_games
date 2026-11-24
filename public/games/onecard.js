@@ -91,7 +91,7 @@ function advanceTurn(state, steps = 1) {
 }
 function beginBattle(state, players) {
   const active = players.map(p => p.slot).filter(Boolean);
-  if (active.length < ONECARD_MIN_PLAYERS) return 'UNO needs at least two players.';
+  if (active.length < ONECARD_MIN_PLAYERS) return 'One Card needs at least two players.';
   state.players = active.slice(0, ONECARD_MAX_PLAYERS);
   state.hands = {};
   state.drawPile = makeDeck();
@@ -173,7 +173,7 @@ function sortHand(hand) {
 const onecard = {
   meta: {
     id: 'onecard',
-    name: 'UNO',
+    name: 'One Card',
     description: 'Classic color-and-number shedding chaos for 2-4 players.',
     supportsComputer: true,
     ui: 'onecard',
@@ -223,7 +223,7 @@ const onecard = {
     const action = move && move.action;
     if (state.phase === 'lobby') {
       if (action !== 'start') return 'Waiting for the host to start the hand.';
-      if (who !== 'A') return 'Only the host can start UNO.';
+      if (who !== 'A') return 'Only the host can start the game.';
       return beginBattle(state, players.length ? players : state.players.map(slot => ({ slot })));
     }
     if (state.phase !== 'battle') return 'Game is already over.';

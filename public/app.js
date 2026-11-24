@@ -1738,19 +1738,27 @@ function sigilForName(name) {
   for (const ch of String(name || '').trim().toLowerCase()) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
   return hash % SIGIL_COUNT;
 }
+// [{ slot, name }] -> Map of slot -> position along the strip, as a CSS percentage.
+function seatSigils(seats) {
+  const taken = new Set();
+  const map = new Map();
+  seats.slice().sort((a, b) => (a.slot < b.slot ? -1 : 1)).forEach(seat => {
+    let mark = sigilForName(seat.name);
+    while (taken.has(mark) && taken.size < SIGIL_COUNT) mark = (mark + 1) % SIGIL_COUNT;
+    taken.add(mark);
+    map.set(seat.slot, `${mark / (SIGIL_COUNT - 1) * 100}%`);
+  });
+  return map;
+}
 function applySeatSigils(d) {
   const opponent = (d.players || []).find(player => player.slot !== d.you);
-  const seats = [
+  const theirSlot = opponent ? opponent.slot : (d.you === 'A' ? 'B' : 'A');
+  const sigils = seatSigils([
     { slot: d.you, name: d.youName || 'You' },
-    { slot: opponent ? opponent.slot : (d.you === 'A' ? 'B' : 'A'), name: (opponent && opponent.name) || d.opponentName || 'Opponent' },
-  ].sort((a, b) => (a.slot < b.slot ? -1 : 1));
-  const first = sigilForName(seats[0].name);
-  let second = sigilForName(seats[1].name);
-  if (second === first) second = (second + 1) % SIGIL_COUNT;
-  const mine = seats[0].slot === d.you ? first : second;
-  const theirs = seats[0].slot === d.you ? second : first;
-  document.body.style.setProperty('--sg-you', `${mine / (SIGIL_COUNT - 1) * 100}%`);
-  document.body.style.setProperty('--sg-opp', `${theirs / (SIGIL_COUNT - 1) * 100}%`);
+    { slot: theirSlot, name: (opponent && opponent.name) || d.opponentName || 'Opponent' },
+  ]);
+  document.body.style.setProperty('--sg-you', sigils.get(d.you));
+  document.body.style.setProperty('--sg-opp', sigils.get(theirSlot));
 }
 
 // ---------------- connect four ----------------
@@ -2432,7 +2440,7 @@ async function claimDotsEdge(type, r, c) {
   await postMove({ type, r, c });
 }
 
-// ---------------- UNO ----------------
+// ---------------- One Card ----------------
 let unoAnimating = false;
 let unoPrevView = null;      // discard/counts snapshot animations run from
 let unoLastMoveNumber = 0;
@@ -2680,7 +2688,7 @@ function unoSetOppCount(slot, count) {
   if (!chip) return;
   const ct = chip.querySelector('.ct');
   if (ct) {
-    ct.textContent = count === 1 ? 'UNO!' : count;
+    ct.textContent = count === 1 ? 'ONE!' : count;
     ct.classList.remove('tick');
     void ct.offsetWidth;
     ct.classList.add('tick');
@@ -2743,7 +2751,7 @@ function unoBanner(d, v) {
     banner.className = 'status them';
     const solo = session && (session.mode === 'computer' || session.bot);
     banner.textContent = solo ? 'READY -- deal the cards when you are'
-      : v.canStart ? 'READY -- start now or wait for more players' : `Share the code -- UNO starts with ${v.minPlayers}+ players`;
+      : v.canStart ? 'READY -- start now or wait for more players' : `Share the code -- One Card starts with ${v.minPlayers}+ players`;
   } else if (v.phase === 'over') {
     const won = v.winner === session.you;
     const winner = players.find(p => p.slot === v.winner);
@@ -2771,6 +2779,7 @@ function renderOneCardStatic(d, v, hold) {
 
   const opponents = $('oneCardOpponents');
   opponents.innerHTML = '';
+  const sigils = seatSigils(players);
   players.filter(p => !p.you).forEach(p => {
     const cards = snap.counts[p.slot] != null ? snap.counts[p.slot] : p.cards;
     const tile = document.createElement('div');
@@ -2784,8 +2793,9 @@ function renderOneCardStatic(d, v, hold) {
     name.textContent = p.name;
     const count = document.createElement('strong');
     count.className = 'ct';
-    count.textContent = cards === 1 ? 'UNO!' : cards;
+    count.textContent = cards === 1 ? 'ONE!' : cards;
     tile.append(name, count);
+    tile.style.setProperty('--sg', sigils.get(p.slot));
     opponents.appendChild(tile);
   });
 

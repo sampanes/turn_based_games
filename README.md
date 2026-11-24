@@ -16,7 +16,7 @@ localhost and be shared privately through a network layer such as Tailscale Serv
 - Dots and Boxes
 - Mancala
 - Ultimate Tic-Tac-Toe
-- UNO-style One Card for two to four players
+- One Card, a color-and-number shedding game for two to four players
 
 Future game ideas are tracked in [GAME_CANDIDATES.md](GAME_CANDIDATES.md).
 
@@ -84,11 +84,11 @@ Games saved before levels existed play at Normal.
 | Connect Four | often misses your threats | wins, blocks, one move ahead | six moves ahead |
 | Dots and Boxes | draws any line, usually takes boxes | careful, occasional slip | the careful bot with no slips |
 | Mancala | half random | two moves ahead | six moves ahead |
-| UNO | random legal card | first legal card | holds wilds, attacks a player about to go out |
+| One Card | random legal card | first legal card | holds wilds, attacks a player about to go out |
 | Ultimate Tic-Tac-Toe | takes wins, otherwise random | wins and blocks boards | neural net on GitHub Pages; elsewhere also avoids handing you a board |
 
 Measured bot against bot (200 games per pairing for Battleship and Mancala, 40 for the
-rest, seats alternating), each level beats the one below it in every game; in UNO luck keeps it close.
+rest, seats alternating), each level beats the one below it in every game; in One Card luck keeps it close.
 
 ## Local Multiplayer
 

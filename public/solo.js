@@ -27,7 +27,7 @@
   // The computer "thinks" between moves instead of answering inside the same
   // call as the human move: the first call only arms a timer, and later polls
   // apply at most one bot move each once its delay has elapsed. Multi-bot
-  // games (UNO) therefore play out one visible move per poll.
+  // games (One Card) therefore play out one visible move per poll.
   function botThinkDelay() { return 600 + Math.floor(Math.random() * 500); }
 
   function botOnTurn(room) {
