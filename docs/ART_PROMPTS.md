@@ -55,6 +55,13 @@ the lighthouse beam with the page's dim teal: in full sonar teal it was louder t
 buttons above it. Keep a picture sheet with an octree palette; a median-cut palette
 dropped the amber and cream.
 
+After the eight sheets, the frames that were baked but unused went to work, with no new
+image files. Battleship: a hit leaves the ship drawn under its mark, a sunk ship is its own
+outline in coral (`fleet.png` used as a mask), the fleet tracker shows ship pictures, and
+the crosshair is the aim stamp. Botty looks surprised at a draw and falls asleep after 45
+seconds of waiting; a draw with a friend shows the crossed flags. One Card chips carry the
+player sigils. Still unused: the sunk stamp. Still not done: sigils on saved rows.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |
