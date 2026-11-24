@@ -3565,6 +3565,11 @@ if (session && launchGame) {
   show('home');
   createComputerGame().finally(clearLaunchParams);
 } else {
+  // Landing on the home screen means no game is open. A game that was on screen when the
+  // tab closed is already in the saved list; left behind as the session, an offline one
+  // would send the next "Play the computer" or friend game to the offline engine, and
+  // the server would then answer that the game does not exist.
+  detachSession();
   show('home');
   clearLaunchParams();
   if (params.play) openGameFromAlert(params.play);
