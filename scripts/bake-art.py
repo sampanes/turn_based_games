@@ -124,6 +124,23 @@ CARDS = {
         "border": (0xCF, 0xE9, 0xEC),  # the ink the painted border snaps to
     },
 }
+# A scene is one wide picture. Its night sky is the darkest ink; the bake
+# makes the sky transparent so the page shows through and the picture has
+# no top edge.
+SCENES = {
+    "home.png": {
+        "sheet": "08-home-scene.png",
+        "width": 720,                 # baked pixels; shown 290 to 620 CSS px wide
+        "keep": (0.0, 0.05, 1.0, 1.0),  # share of the sheet kept: left, top, right, bottom
+        # The nearest band of waves, a step lighter than slate, and the dim
+        # teal of the page (--sonar-dim).
+        "extra_inks": [(0x1C, 0x53, 0x6B), (0x1F, 0x8A, 0x78)],
+        # The lighthouse beam came back in full sonar teal, louder than the
+        # page's own buttons. Refill the flat region at this point (as a
+        # share of the baked picture) with the dim teal.
+        "refill": [((0.8, 0.3), (0x1F, 0x8A, 0x78))],
+    },
+}
 
 
 def ink_mask(image):
@@ -302,6 +319,34 @@ def bake_card(spec):
     return buffer.getvalue()
 
 
+def bake_scene(spec):
+    sheet = Image.open(os.path.join(SHEETS, spec["sheet"])).convert("RGB")
+    width, height = sheet.size
+    left, top, right, bottom = spec["keep"]
+    sheet = sheet.crop((round(left * width), round(top * height), round(right * width), round(bottom * height)))
+    out_w = spec["width"]
+    out_h = round(sheet.size[1] * out_w / sheet.size[0])
+    small = sheet.resize((out_w, out_h), Image.LANCZOS)
+    inks = INKS + spec.get("extra_inks", [])
+    clear = len(inks)
+    flat = [channel for ink in inks for channel in ink]
+    holder = Image.new("P", (1, 1))
+    holder.putpalette(flat + flat[:3] * (256 - len(inks)))
+    baked = small.quantize(palette=holder, dither=Image.NONE).point(lambda p: p if p < clear else 0)
+    # The sky is the darkest ink where it is joined to the top edge. A row of
+    # sky added above lets one fill reach it all, however the picture is cut.
+    framed = Image.new("P", (out_w, out_h + 1), 0)
+    framed.paste(baked, (0, 1))
+    ImageDraw.floodfill(framed, (0, 0), clear)
+    baked = framed.crop((0, 1, out_w, out_h + 1))
+    for (x, y), ink in spec.get("refill", []):
+        ImageDraw.floodfill(baked, (round(x * out_w), round(y * out_h)), inks.index(ink))
+    baked.putpalette(flat + [0, 0, 0] * (256 - len(inks)))
+    buffer = io.BytesIO()
+    baked.save(buffer, "PNG", optimize=True, bits=4, transparency=clear)
+    return buffer.getvalue()
+
+
 def main():
     check = "--check" in sys.argv[1:]
     stale = []
@@ -310,6 +355,7 @@ def main():
     jobs += [(name, bake_fleet, spec) for name, spec in FLEET.items()]
     jobs += [(name, bake_pictures, spec) for name, spec in PICTURES.items()]
     jobs += [(name, bake_card, spec) for name, spec in CARDS.items()]
+    jobs += [(name, bake_scene, spec) for name, spec in SCENES.items()]
     for name, bake, spec in jobs:
         data = bake(spec)
         path = os.path.join(OUT, name)

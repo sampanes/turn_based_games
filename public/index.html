@@ -63,6 +63,13 @@
     box-shadow: inset 0 1px 0 rgba(52,231,196,.06), 0 14px 40px rgba(0,0,0,.4);
   }
   h2 { font-size: 15px; letter-spacing: 1px; text-transform: uppercase; color: var(--sonar); margin: 0 0 12px; }
+  /* home scene: art/home.png, flat inks under a clear sky, bled to the lower edge of the home
+     card. The ::before holds the picture's shape (720 x 456) at any width. */
+  .home-scene {
+    margin: 18px -14px -14px; border-radius: 0 0 13px 13px;
+    background: url(art/home.png) center bottom / 100% auto no-repeat;
+  }
+  .home-scene::before { content: ""; display: block; padding-bottom: 63.33%; }
   p.lede { color: var(--mute); font-size: 13px; line-height: 1.6; margin: 0 0 14px; }
   label { display: block; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mute); margin: 12px 0 6px; }
   input, select {
@@ -1306,6 +1313,7 @@
     body { --page-pad: 24px; }
     .wrap { max-width: 1040px; }
     .card { padding: 22px; }
+    .home-scene { margin: 22px -22px -22px; }
     .connect-panel, .dots-panel { max-width: 760px; margin-left: auto; margin-right: auto; }
     #placement.card, #home.card, #lobby.card { max-width: 620px; margin-left: auto; margin-right: auto; }
     .uno-opponents { max-width: 620px; width: 100%; margin: 0 auto; }
@@ -1364,6 +1372,7 @@
         <button onclick="joinGame()">Join</button>
       </div>
     </div>
+    <div class="home-scene" aria-hidden="true"></div>
   </section>
 
   <!-- INVITE: opened from an invitation link -->

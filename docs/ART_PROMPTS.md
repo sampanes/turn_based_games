@@ -48,6 +48,13 @@ Sheet 7b is done: `art/sheets/07b-card-back.png` (kept at half size), baked to
 around the medallion and snaps it to the inks; the page draws the border and corners.
 It is the draw pile and the back of a card in flight.
 
+Sheet 8 is done, which is all eight: `art/sheets/08-home-scene.png` (kept at half size),
+baked to `public/art/home.png` and shown at the foot of the home card. The bake cuts the
+night sky out so the card shows through, adds one ink for the nearest waves, and refills
+the lighthouse beam with the page's dim teal: in full sonar teal it was louder than the
+buttons above it. Keep a picture sheet with an octree palette; a median-cut palette
+dropped the amber and cream.
+
 ## Where art pays, in order
 
 | # | Sheet | Kind | Replaces / fills |
