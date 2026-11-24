@@ -85,7 +85,7 @@ function show(id) {
   document.body.classList.toggle('mancala-mode', id === 'mancala');
   document.body.classList.toggle('uno-mode', id === 'oneCard');
   updateFxButton();
-  ['home','invite','settings','lobby','placement','battle','connectFour','dotsBoxes','oneCard','mancala','ultimateTTT'].forEach(section => {
+  ['home','invite','settings','lobby','placement','battle','connectFour','dotsBoxes','oneCard','mancala','ultimateTTT','reversi','checkers','pig'].forEach(section => {
     const el = $(section);
     if (el) el.classList.toggle('hidden', section !== id);
   });
@@ -397,6 +397,7 @@ function sectionForGame(gameId) {
     : ui === 'onecard' ? 'oneCard'
     : ui === 'mancala' ? 'mancala'
     : ui === 'ultimatettt' ? 'ultimateTTT'
+    : ui === 'reversi' || ui === 'checkers' || ui === 'pig' ? ui
     : 'battle';
 }
 
@@ -894,6 +895,21 @@ function render(d) {
     renderOneCard(d, v);
     return;
   }
+  if ((v.ui || (meta && meta.ui)) === 'reversi') {
+    show('reversi');
+    renderReversi(d, v);
+    return;
+  }
+  if ((v.ui || (meta && meta.ui)) === 'checkers') {
+    show('checkers');
+    renderCheckers(d, v);
+    return;
+  }
+  if ((v.ui || (meta && meta.ui)) === 'pig') {
+    show('pig');
+    renderPig(d, v);
+    return;
+  }
 
   if (v.phase === 'placing') {
     if (v.youPlaced) {
@@ -995,7 +1011,8 @@ function battleSfx(kind) {
 // ---------------- shared UI reset ----------------
 // Each game's screen file resets its own board (resetBattleshipUi and so on). A game
 // that has not been opened since the page loaded has no file here and nothing to reset.
-const GAME_UI_RESETS = ['resetBattleshipUi', 'resetConnectFourUi', 'resetDotsBoxesUi', 'resetOneCardUi', 'resetMancalaUi', 'resetUltimateTttUi'];
+const GAME_UI_RESETS = ['resetBattleshipUi', 'resetConnectFourUi', 'resetDotsBoxesUi', 'resetOneCardUi', 'resetMancalaUi', 'resetUltimateTttUi',
+  'resetReversiUi', 'resetCheckersUi', 'resetPigUi'];
 function resetGameUi() {
   GAME_UI_RESETS.forEach(name => { if (typeof window[name] === 'function') window[name](); });
 }
@@ -1031,6 +1048,17 @@ function applySeatSigils(d) {
   ]);
   document.body.style.setProperty('--sg-you', sigils.get(d.you));
   document.body.style.setProperty('--sg-opp', sigils.get(theirSlot));
+}
+
+// ---------------- seats in a two-player game ----------------
+function rivalSlot(d) {
+  const rival = (d.players || []).find(player => player.slot !== d.you);
+  return rival ? rival.slot : d.you === 'A' ? 'B' : 'A';
+}
+function seatName(d, slot) {
+  if (slot === d.you) return d.youName || 'You';
+  const seat = (d.players || []).find(player => player.slot === slot);
+  return (seat && seat.name) || d.opponentName || 'Opponent';
 }
 
 // ---------------- boot ----------------

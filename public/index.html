@@ -135,6 +135,15 @@
   .emblem.g-mancala { -webkit-mask-position: 37.5% 0; mask-position: 37.5% 0; }
   .emblem.g-ultimatettt { -webkit-mask-position: 50% 0; mask-position: 50% 0; }
   .emblem.g-onecard { -webkit-mask-position: 62.5% 0; mask-position: 62.5% 0; }
+  .emblem.g-reversi { -webkit-mask-position: 75% 0; mask-position: 75% 0; }
+  .emblem.g-checkers { -webkit-mask-position: 87.5% 0; mask-position: 87.5% 0; }
+  /* Pig has no stamp yet (sheet 9 in docs/ART_PROMPTS.md): a plain die stands in. */
+  .emblem.g-pig {
+    --pip: radial-gradient(circle closest-side, #0a1f2b 88%, transparent 100%);
+    -webkit-mask-image: none; mask-image: none; border-radius: 19%; transform: scale(.84);
+    background-image: var(--pip), var(--pip), var(--pip), var(--pip), var(--pip); background-repeat: no-repeat; background-size: 21% 21%;
+    background-position: 20% 20%, 80% 20%, 50% 50%, 20% 80%, 80% 80%;
+  }
   /* Botty: six faces in one strip (art/botty.png, baked by scripts/bake-art.py). Against the
      computer the face rides in the status banner and follows its state: calm on your turn
      (asleep once you have left it waiting), thinking on its own, delighted when it wins,
@@ -904,6 +913,145 @@
     .uttt-mini.won-X .uttt-mini-winner::before, .uttt-mini.won-O .uttt-mini-winner::before { width: 72%; height: 72%; filter: drop-shadow(0 0 9px currentColor); }
     .uttt-mini.won-X .uttt-mini-winner::before { -webkit-mask-position: 42.8571% 0; mask-position: 42.8571% 0; }
     .uttt-mini.won-O .uttt-mini-winner::before { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+  }
+  /* Reversi, Checkers and Pig borrow the Dots and Boxes panel (score bar, stage, end banner,
+     buttons) and the Connect Four disc, sigil included. */
+  .dots-turn.opponent strong { color: var(--dots-opp); }
+  /* room for two lines, so the board does not shift under a finger when the turn changes */
+  .sq-panel .status { margin-top: 0; min-height: 60px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; line-height: 1.22; }
+  .sq-board {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; width: min(100%, 480px); aspect-ratio: 1;
+    margin: 0 auto; padding: 5px; border-radius: 12px; background: var(--line);
+  }
+  .sq-cell {
+    position: relative; min-width: 0; min-height: 0; aspect-ratio: 1; padding: 0; border: 0; border-radius: 3px;
+    background: var(--deep); box-shadow: none; touch-action: manipulation;
+  }
+  button.sq-cell:active { transform: none; }
+  button.sq-cell:disabled { cursor: default; }
+  .sq-cell .cf-disc { inset: 9%; }
+  .sq-cell.last { box-shadow: inset 0 0 0 2px rgba(207,233,236,.42); }
+  .sq-cell.valid::after, .sq-cell.dest::after {
+    content: ""; position: absolute; inset: 35%; border-radius: 50%; background: rgba(52,231,196,.55);
+    box-shadow: 0 0 10px rgba(52,231,196,.45);
+  }
+  .sq-cell.valid, .sq-cell.dest, .sq-cell.can { cursor: pointer; }
+  .sq-cell.valid:active::after, .sq-cell.dest:active::after { inset: 22%; }
+  /* Reversi: a placed disc drops in; a trapped one turns edge-on in its old color, then
+     faces you in the new one (--i: squares away from the placed disc) */
+  .cf-disc.rv-new { animation: rvDrop .26s cubic-bezier(.2,.9,.3,1.35); }
+  .cf-disc.rv-out { animation: rvOut .16s ease-in both; animation-delay: calc(var(--i, 1) * 70ms); }
+  .cf-disc.rv-in { animation: rvIn .2s ease-out both; animation-delay: calc(var(--i, 1) * 70ms + .16s); }
+  @keyframes rvDrop { from { transform: scale(.3); opacity: 0; } }
+  @keyframes rvOut { to { transform: scaleX(0); } }
+  @keyframes rvIn { from { transform: scaleX(0); } }
+  /* Checkers: play is on the dark squares. A piece that can move wears a ring, the picked
+     one a bright ring, and a square it can go to a dot (amber when that is a jump). */
+  .ck-light { background: rgba(207,233,236,.14); }
+  .ck-cell.can::before, .ck-cell.sel::before {
+    content: ""; position: absolute; inset: 3%; border-radius: 50%; border: 2px solid rgba(52,231,196,.5);
+  }
+  .ck-cell.sel { background: rgba(52,231,196,.2); }
+  .ck-cell.sel::before { border-color: var(--sonar); box-shadow: 0 0 12px rgba(52,231,196,.55); }
+  .ck-cell.dest { background: rgba(52,231,196,.1); }
+  .ck-cell.dest.jump::after { background: rgba(255,179,71,.8); box-shadow: 0 0 10px rgba(255,179,71,.5); }
+  .cf-disc.ck-king::before { content: none; }
+  .ck-crown {
+    position: absolute; inset: 17%; z-index: 1; display: grid; place-items: center;
+    font-style: normal; font-weight: 900; font-size: 15px; color: rgba(2,58,70,.82);
+  }
+  .cf-disc.opponent .ck-crown { color: rgba(92,48,2,.82); }
+  .ck-crown.fresh { animation: rvDrop .45s cubic-bezier(.2,.9,.3,1.5); }
+  /* the crown is cut from the checkers emblem (art/crown.png, baked by scripts/bake-art.py) */
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .ck-crown {
+      font-size: 0; background: currentColor;
+      -webkit-mask: url(art/crown.png) center / contain no-repeat; mask: url(art/crown.png) center / contain no-repeat;
+    }
+  }
+  .cf-disc.ck-slide { z-index: 3; animation: ckSlide .24s ease-out; }
+  .cf-disc.ck-ghost { animation: ckGone .34s ease-in both; }
+  @keyframes ckSlide { from { transform: translate(calc(var(--dx, 0) * 122%), calc(var(--dy, 0) * 122%)); } }
+  @keyframes ckGone { to { transform: scale(.2); opacity: 0; } }
+  /* Pig: a seat per player, two dice, the pot, and the two buttons */
+  .pig-seats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; margin-top: 12px; }
+  .pig-seat {
+    min-width: 0; padding: 8px 8px 9px; border-radius: 12px; border: 1px solid var(--dots-line);
+    background: linear-gradient(180deg, rgba(5,23,35,.92), rgba(2,10,18,.94));
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  .pig-seat .nm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #f4fbff; }
+  .pig-seat strong { font-size: 24px; font-weight: 900; line-height: 1; color: var(--dots-opp); }
+  .pig-seat.you strong { color: var(--dots-you); }
+  .pig-seat i { display: block; width: 100%; height: 5px; border-radius: 3px; background: rgba(207,233,236,.12); overflow: hidden; }
+  .pig-seat i b { display: block; height: 100%; border-radius: 3px; background: var(--dots-opp); }
+  .pig-seat.you i b { background: var(--dots-you); }
+  .pig-seat.active { border-color: var(--dots-opp); box-shadow: 0 0 16px var(--dots-opp-soft); }
+  .pig-seat.you.active { border-color: var(--dots-you); box-shadow: 0 0 16px var(--dots-you-soft); }
+  .pig-seat.winner { border-color: #f4fbff; }
+  @supports ((-webkit-mask-image: none) or (mask-image: none)) {
+    .pig-seat .nm::before {
+      content: ""; display: inline-block; width: 13px; height: 13px; margin-right: 4px; vertical-align: -2px; background: var(--dots-opp);
+      -webkit-mask-image: url(art/sigils.png); mask-image: url(art/sigils.png);
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: 900% 100%; mask-size: 900% 100%;
+      -webkit-mask-position: var(--sg, 0%) 0; mask-position: var(--sg, 0%) 0;
+    }
+    .pig-seat.you .nm::before { background: var(--dots-you); }
+    @media (max-width: 359px) { .pig-seat .nm::before { display: none; } } /* four seats leave no room beside a name */
+  }
+  .pig-stage { text-align: center; }
+  .pig-lobby { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 0; }
+  .pig-lobby-label { color: var(--mute); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .pig-lobby strong { font-size: 34px; letter-spacing: 8px; color: var(--sonar); }
+  .pig-lobby button { width: min(100%, 280px); }
+  .pig-dice { display: flex; justify-content: center; gap: clamp(14px, 6vw, 28px); padding: 14px 0 6px; }
+  /* A die drawn by the page: pips are dots on the face. The one is a pig's snout. */
+  .pig-die {
+    --pip: radial-gradient(circle closest-side, #06141b 88%, transparent 100%);
+    width: clamp(68px, 24vw, 104px); aspect-ratio: 1; border-radius: 19%;
+    background-color: var(--ink); background-repeat: no-repeat; background-size: 21% 21%;
+    box-shadow: inset 0 -6px 0 rgba(6,20,27,.2), inset 0 2px 0 rgba(255,255,255,.5), 0 8px 18px rgba(0,0,0,.45);
+    transition: opacity .2s ease;
+  }
+  .pig-die.f1 {
+    background-image: radial-gradient(ellipse closest-side, var(--ink) 90%, transparent 100%),
+      radial-gradient(ellipse closest-side, var(--ink) 90%, transparent 100%),
+      radial-gradient(ellipse closest-side, #06141b 94%, transparent 100%);
+    background-size: 11% 17%, 11% 17%, 62% 46%; background-position: 40% 50%, 60% 50%, 50% 50%;
+  }
+  .pig-die.f2 { background-image: var(--pip), var(--pip); background-position: 20% 20%, 80% 80%; }
+  .pig-die.f3 { background-image: var(--pip), var(--pip), var(--pip); background-position: 20% 20%, 50% 50%, 80% 80%; }
+  .pig-die.f4 { background-image: var(--pip), var(--pip), var(--pip), var(--pip); background-position: 20% 20%, 80% 20%, 20% 80%, 80% 80%; }
+  .pig-die.f5 { background-image: var(--pip), var(--pip), var(--pip), var(--pip), var(--pip); background-position: 20% 20%, 80% 20%, 50% 50%, 20% 80%, 80% 80%; }
+  .pig-die.f6 { background-image: var(--pip), var(--pip), var(--pip), var(--pip), var(--pip), var(--pip); background-position: 20% 20%, 20% 50%, 20% 80%, 80% 20%, 80% 50%, 80% 80%; }
+  .pig-die.pig { background-color: var(--fire); }
+  .pig-die.pig.f1 { background-image: radial-gradient(ellipse closest-side, var(--fire) 90%, transparent 100%),
+      radial-gradient(ellipse closest-side, var(--fire) 90%, transparent 100%),
+      radial-gradient(ellipse closest-side, #06141b 94%, transparent 100%); }
+  .pig-die.stale { opacity: .42; }
+  .pig-die.rolling { animation: pigTumble .26s linear infinite; }
+  .pig-die.rolling:nth-child(2) { animation-direction: reverse; }
+  .pig-die.land { animation: pigLand .3s cubic-bezier(.2,.9,.3,1.4); }
+  .pig-die.thud { animation: pigThud .45s ease; }
+  @keyframes pigTumble { 50% { transform: translateY(-10px) rotate(180deg); } 100% { transform: rotate(360deg); } }
+  @keyframes pigLand { from { transform: scale(1.18) rotate(-8deg); } }
+  @keyframes pigThud {
+    20% { transform: translateX(-7px) rotate(-4deg); } 40% { transform: translateX(7px) rotate(4deg); }
+    60% { transform: translateX(-5px); } 80% { transform: translateX(4px); }
+  }
+  .pig-pot { display: flex; flex-direction: column; align-items: center; margin-top: 6px; }
+  .pig-pot span { color: var(--mute); font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+  .pig-pot strong { font-family: Impact, 'Arial Black', sans-serif; font-weight: 400; font-size: 46px; line-height: 1.05; color: #f5fbff; }
+  .pig-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+  .pig-buttons button { min-width: 0; min-height: 58px; font-size: 16px; font-weight: 700; }
+  .pig-buttons button:disabled { opacity: .35; cursor: not-allowed; }
+  .pig-bank { background: rgba(255,179,71,.14); border-color: rgba(255,179,71,.6); color: var(--amber); }
+  .pig-bank.wins { background: linear-gradient(180deg, var(--amber), #cf7d0d); color: #241604; border-color: transparent; }
+  @media (prefers-reduced-motion: reduce) {
+    .cf-disc.rv-new, .cf-disc.rv-in, .cf-disc.ck-slide, .ck-crown.fresh, .pig-die.land, .pig-die.thud { animation: none; }
+    .cf-disc.rv-out, .cf-disc.ck-ghost { display: none; }
   }
   .uttt-legend { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--mute); font-size: 12px; }
   .uttt-piece { font-weight: 900; margin-right: 4px; }
@@ -1705,6 +1853,118 @@
     <div class="uttt-legend" id="utttLegend"></div>
     <button class="primary mt solo-restart hidden" style="width:100%" onclick="restartComputerGame()">New game</button>
     <button class="ghost mt" style="width:100%" onclick="leaveGame()">Home</button>
+  </section>
+
+  <!-- REVERSI -->
+  <section id="reversi" class="card dots-panel sq-panel hidden">
+    <div id="rvStatus" class="status">...</div>
+    <div class="dots-scorebar">
+      <div class="dots-player you">
+        <div>
+          <strong id="rvYouName">You</strong>
+          <span>Your discs</span>
+        </div>
+        <div class="dots-score" id="rvYouScore">2</div>
+      </div>
+      <div class="dots-turn" id="rvTurn">
+        <span>Turn</span>
+        <strong id="rvTurnText">You</strong>
+        <span id="rvProgress"></span>
+      </div>
+      <div class="dots-player opponent">
+        <div class="dots-score" id="rvOpponentScore">2</div>
+        <div>
+          <strong id="rvOpponentName">Opponent</strong>
+          <span>Their discs</span>
+        </div>
+      </div>
+    </div>
+    <div class="dots-stage">
+      <div class="sq-board" id="rvBoard" role="grid" aria-label="Reversi board"></div>
+      <div class="dots-last" id="rvLast"></div>
+    </div>
+    <div id="rvEndBanner" class="dots-end hidden">
+      <strong id="rvEndTitle">Victory</strong>
+      <span id="rvEndSub"></span>
+    </div>
+    <div class="dots-actions">
+      <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost" onclick="leaveGame()">Home</button>
+    </div>
+  </section>
+
+  <!-- CHECKERS -->
+  <section id="checkers" class="card dots-panel sq-panel hidden">
+    <div id="ckStatus" class="status">...</div>
+    <div class="dots-scorebar">
+      <div class="dots-player you">
+        <div>
+          <strong id="ckYouName">You</strong>
+          <span>Your pieces</span>
+        </div>
+        <div class="dots-score" id="ckYouScore">12</div>
+      </div>
+      <div class="dots-turn" id="ckTurn">
+        <span>Turn</span>
+        <strong id="ckTurnText">You</strong>
+        <span id="ckProgress"></span>
+      </div>
+      <div class="dots-player opponent">
+        <div class="dots-score" id="ckOpponentScore">12</div>
+        <div>
+          <strong id="ckOpponentName">Opponent</strong>
+          <span>Their pieces</span>
+        </div>
+      </div>
+    </div>
+    <div class="dots-stage">
+      <div class="sq-board" id="ckBoard" role="grid" aria-label="Checkers board"></div>
+      <div class="dots-last" id="ckLast"></div>
+    </div>
+    <div id="ckEndBanner" class="dots-end hidden">
+      <strong id="ckEndTitle">Victory</strong>
+      <span id="ckEndSub"></span>
+    </div>
+    <div class="dots-actions">
+      <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost" onclick="leaveGame()">Home</button>
+    </div>
+  </section>
+
+  <!-- PIG -->
+  <section id="pig" class="card dots-panel sq-panel hidden">
+    <div id="pigStatus" class="status">...</div>
+    <div class="pig-seats" id="pigSeats"></div>
+    <div class="dots-stage pig-stage">
+      <div id="pigLobby" class="pig-lobby hidden">
+        <span class="pig-lobby-label room-share">Invite code</span>
+        <strong id="pigCode" class="room-share">....</strong>
+        <button id="pigStart" class="primary hidden" onclick="startPig()">Start the game</button>
+      </div>
+      <div id="pigTable">
+        <div class="pig-dice" id="pigDice"><span class="pig-die f6 stale" role="img"></span><span class="pig-die f6 stale" role="img"></span></div>
+        <div class="pig-pot"><span id="pigPotLabel">Pot</span><strong id="pigPot">0</strong></div>
+        <div class="dots-last" id="pigLast"></div>
+        <div class="pig-buttons">
+          <button id="pigRoll" class="primary" onclick="rollPig()" disabled>Roll</button>
+          <button id="pigBank" class="pig-bank" onclick="bankPig()" disabled>Bank</button>
+        </div>
+      </div>
+    </div>
+    <div id="pigEndBanner" class="dots-end hidden">
+      <strong id="pigEndTitle">Victory</strong>
+      <span id="pigEndSub"></span>
+    </div>
+    <div class="dots-actions">
+      <button class="ghost room-share" onclick="copyRoomCode()">Copy code</button>
+      <button class="ghost fx-btn" onclick="toggleBattleFx()">FX on</button>
+      <button class="primary solo-restart hidden" onclick="restartComputerGame()">New game</button>
+      <button class="ghost" onclick="leaveGame()">Home</button>
+    </div>
   </section>
 
   <div class="footnote" id="foot"></div>

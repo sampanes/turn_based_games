@@ -36,6 +36,9 @@
     { id: 'onecard', name: 'One Card', description: 'Classic color-and-number shedding chaos for 2-4 players.', supportsComputer: true, ui: 'onecard', minPlayers: 2, maxPlayers: 4 },
     { id: 'mancala', name: 'Mancala', description: 'Sow seeds around the board. Capture the most in your store to win.', supportsComputer: true, ui: 'mancala' },
     { id: 'ultimatettt', name: 'Ultimate Tic-Tac-Toe', description: 'Win three mini-boards in a row. Your move sends your opponent to a specific board.', supportsComputer: true, ui: 'ultimatettt' },
+    { id: 'reversi', name: 'Reversi', description: 'Trap a line of their discs between two of yours to flip them. Most discs wins.', supportsComputer: true, ui: 'reversi' },
+    { id: 'checkers', name: 'Checkers', description: 'Jump their pieces, crown your own. Take them all or leave them no move.', supportsComputer: true, ui: 'checkers' },
+    { id: 'pig', name: 'Pig', description: 'Roll two dice and bank the pot, or risk it for more. First to 100 wins.', supportsComputer: true, ui: 'pig', minPlayers: 2, maxPlayers: 4 },
   ].forEach(listed => { if (!games[listed.id]) games[listed.id] = listed; });
 
   root.TurnBasedGamesRegistry = { games, registerGame, getGame, listGames };

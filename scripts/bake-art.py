@@ -87,6 +87,19 @@ STAMPS = {
         "margin": 0.03,
     },
 }
+# One figure lifted out of a stamp cell that holds two: the ink joined to the
+# cell's topmost point. The checkers emblem is a piece with a crown resting on
+# it; the crown alone marks a king on the board.
+PARTS = {
+    "crown.png": {
+        "sheet": "01-game-emblems.png",
+        "cols": 3,
+        "rows": 3,
+        "index": 7,       # the cell, counted from 0 in reading order
+        "cell": 64,       # shown at 14 to 36 CSS px
+        "margin": 0.04,
+    },
+}
 # Ships are not on a grid: each is one band of ink, top to bottom, bow to
 # the right. Baked as a 10 x 5 block of square cells: the left 5 x 5 holds
 # the ships lying east (row = ship, column = cell from the stern), the right
@@ -184,6 +197,29 @@ def bake_stamps(spec):
         strip.paste(ink, (index * cell + (cell - size[0]) // 2, (cell - size[1]) // 2))
     # Threshold after the downscale: no gray edge pixels, so the file is 1-bit.
     bits = strip.point(lambda p: 1 if p >= 128 else 0).convert("P")
+    bits.putpalette([0, 0, 0, 255, 255, 255])
+    buffer = io.BytesIO()
+    bits.save(buffer, "PNG", optimize=True, bits=1, transparency=0)
+    return buffer.getvalue()
+
+
+def bake_part(spec):
+    sheet = Image.open(os.path.join(SHEETS, spec["sheet"]))
+    ink = ink_mask(list(cells(sheet, spec["cols"], spec["rows"]))[spec["index"]])
+    bounds = ink.getbbox()
+    if not bounds:
+        raise SystemExit(f"{spec['sheet']}: cell {spec['index'] + 1} is empty")
+    top = ink.crop((0, bounds[1], ink.size[0], bounds[1] + 1)).getbbox()
+    ImageDraw.floodfill(ink, ((top[0] + top[2]) // 2, bounds[1]), 128)
+    figure = ink.point(lambda p: 255 if p == 128 else 0)
+    figure = figure.crop(figure.getbbox())
+    cell = spec["cell"]
+    scale = cell * (1 - 2 * spec["margin"]) / max(figure.size)
+    size = (max(1, round(figure.size[0] * scale)), max(1, round(figure.size[1] * scale)))
+    figure = figure.resize(size, Image.LANCZOS)
+    out = Image.new("L", (cell, cell), 0)
+    out.paste(figure, ((cell - size[0]) // 2, (cell - size[1]) // 2))
+    bits = out.point(lambda p: 1 if p >= 128 else 0).convert("P")
     bits.putpalette([0, 0, 0, 255, 255, 255])
     buffer = io.BytesIO()
     bits.save(buffer, "PNG", optimize=True, bits=1, transparency=0)
@@ -352,6 +388,7 @@ def main():
     stale = []
     os.makedirs(OUT, exist_ok=True)
     jobs = [(name, bake_stamps, spec) for name, spec in STAMPS.items()]
+    jobs += [(name, bake_part, spec) for name, spec in PARTS.items()]
     jobs += [(name, bake_fleet, spec) for name, spec in FLEET.items()]
     jobs += [(name, bake_pictures, spec) for name, spec in PICTURES.items()]
     jobs += [(name, bake_card, spec) for name, spec in CARDS.items()]

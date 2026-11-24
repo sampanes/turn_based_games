@@ -39,7 +39,8 @@ function testGameCodeOnDemand(pageHtml) {
   // Calls from app.js into a game's screen file. Each is safe only because it runs after
   // that game has been drawn (render and its key handlers) or is guarded by typeof.
   const allowed = new Set(['initPlacement', 'renderBattle', 'toggleOrient', 'updateAimUi', 'renderConnectFour', 'connectStepFocus',
-    'connectUi', 'dropConnectDisc', 'renderDotsBoxes', 'renderMancala', 'renderOneCard', 'drawOneCard', 'layoutOneCardFan', 'renderUltimateTTT']);
+    'connectUi', 'dropConnectDisc', 'renderDotsBoxes', 'renderMancala', 'renderOneCard', 'drawOneCard', 'layoutOneCardFan', 'renderUltimateTTT',
+    'renderReversi', 'renderCheckers', 'renderPig']);
   for (const [id, source] of Object.entries(screens)) {
     for (const name of topLevelNames(source)) {
       if (!allowed.has(name)) assert.ok(!usesName(app, name), `app.js uses ${name}, which lives in ui/${id}.js and may not be loaded yet`);
@@ -202,14 +203,147 @@ function testBattleshipCanonicalCells() {
   assert.strictEqual(bs.validateSetup(bs.init(), 'A', [null, null, null, null, null]), 'Bad ship.');
 }
 
+function testReversiFlipsAndPasses() {
+  const reversi = require('../public/games/reversi');
+  const state = reversi.init();
+  // The four opening squares for A, each flipping one disc.
+  assert.deepStrictEqual(reversi.viewFor(state, 'A').validMoves, [19, 26, 37, 44].map(idx => ({ idx, flips: 1 })));
+  assert.deepStrictEqual(reversi.viewFor(state, 'B').validMoves, []);
+  assert.strictEqual(reversi.applyMove(state, 'A', { idx: 0 }), 'A disc there flips nothing.');
+  assert.strictEqual(reversi.applyMove(state, 'B', { idx: 19 }), 'Not your turn.');
+  assert.strictEqual(reversi.applyMove(state, 'A', { idx: 19 }), null);
+  assert.deepStrictEqual(state.lastMove, { n: 1, by: 'A', idx: 19, flips: [27], passed: false });
+  assert.deepStrictEqual(reversi.viewFor(state, 'A').counts, { A: 4, B: 1 });
+  assert.strictEqual(state.turn, 'B');
+
+  // B has nowhere to go after A's move, so A moves again.
+  const pass = reversi.init();
+  pass.board = Array(64).fill(null);
+  [[0, 'A'], [1, 'B'], [54, 'B'], [63, 'A']].forEach(([idx, who]) => { pass.board[idx] = who; });
+  assert.strictEqual(reversi.applyMove(pass, 'A', { idx: 2 }), null);
+  assert.strictEqual(pass.lastMove.passed, true);
+  assert.strictEqual(pass.turn, 'A');
+  assert.strictEqual(pass.phase, 'battle');
+
+  // Neither player can move: the game ends on the count.
+  const end = reversi.init();
+  end.board = Array(64).fill(null);
+  [[0, 'A'], [1, 'B'], [63, 'B'], [62, 'B']].forEach(([idx, who]) => { end.board[idx] = who; });
+  assert.strictEqual(reversi.applyMove(end, 'A', { idx: 2 }), null);
+  assert.strictEqual(end.phase, 'over');
+  assert.strictEqual(end.winner, 'A');
+}
+
+function testCheckersJumpsAndKings() {
+  const checkers = require('../public/games/checkers');
+  const state = checkers.init();
+  assert.strictEqual(checkers.viewFor(state, 'A').moves.length, 7);
+  assert.strictEqual(checkers.viewFor(state, 'A').counts.A, 12);
+  assert.strictEqual(checkers.applyMove(state, 'A', { from: 40, to: 32 }), 'That piece cannot move there.');
+  assert.strictEqual(checkers.applyMove(state, 'A', { from: 40, to: 33 }), null);
+  assert.strictEqual(state.turn, 'B');
+
+  // A jump must be taken, the same man keeps jumping, and the turn passes only after.
+  const jump = checkers.init();
+  jump.board = Array(64).fill('');
+  jump.board[44] = 'a'; jump.board[60] = 'a'; jump.board[35] = 'b'; jump.board[19] = 'b'; jump.board[1] = 'b';
+  assert.strictEqual(checkers.viewFor(jump, 'A').mustJump, true);
+  assert.strictEqual(checkers.applyMove(jump, 'A', { from: 60, to: 53 }), 'You have a jump and must take it.');
+  assert.strictEqual(checkers.applyMove(jump, 'A', { from: 44, to: 26 }), null);
+  assert.strictEqual(jump.board[35], '');
+  assert.strictEqual(jump.turn, 'A');
+  assert.strictEqual(jump.chain, 26);
+  assert.strictEqual(checkers.applyMove(jump, 'A', { from: 60, to: 53 }), 'Keep jumping with the same piece.');
+  assert.strictEqual(checkers.applyMove(jump, 'A', { from: 26, to: 12 }), null);
+  assert.strictEqual(jump.chain, null);
+  assert.strictEqual(jump.turn, 'B');
+  assert.deepStrictEqual(checkers.viewFor(jump, 'B').counts, { A: 2, B: 1, kingsA: 0, kingsB: 0 });
+
+  // A man that reaches the far row is crowned, and a king moves backward.
+  const crown = checkers.init();
+  crown.board = Array(64).fill('');
+  crown.board[10] = 'a'; crown.board[30] = 'b'; crown.board[56] = 'a';
+  assert.strictEqual(checkers.applyMove(crown, 'A', { from: 10, to: 1 }), null);
+  assert.strictEqual(crown.board[1], 'A');
+  assert.strictEqual(crown.lastMove.crowned, true);
+  assert.strictEqual(checkers.applyMove(crown, 'B', { from: 30, to: 21 }), 'That piece cannot move there.');
+  assert.strictEqual(checkers.applyMove(crown, 'B', { from: 30, to: 37 }), null);
+  assert.strictEqual(checkers.applyMove(crown, 'A', { from: 1, to: 10 }), null);
+
+  // Taking the last piece wins.
+  const last = checkers.init();
+  last.board = Array(64).fill('');
+  last.board[44] = 'a'; last.board[35] = 'b';
+  assert.strictEqual(checkers.applyMove(last, 'A', { from: 44, to: 26 }), null);
+  assert.strictEqual(last.phase, 'over');
+  assert.strictEqual(last.winner, 'A');
+}
+
+function testPigPotsAndPigs() {
+  const pig = require('../public/games/pig');
+  const seats = [{ slot: 'A', name: 'Ann' }, { slot: 'B', name: 'Ben' }, { slot: 'C', name: 'Cy' }];
+  const state = pig.init();
+  pig.onPlayerJoined(state, 'A');
+  assert.strictEqual(pig.viewFor(state, 'A', seats).canStart, false);
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'start' }, seats), 'Pig needs at least two players.');
+  pig.onPlayerJoined(state, 'B');
+  pig.onPlayerJoined(state, 'C');
+  assert.strictEqual(pig.applyMove(state, 'B', { action: 'start' }, seats), 'Only the host can start the game.');
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'start' }, seats), null);
+  pig.onPlayerJoined(state, 'D'); // too late: the game has started
+  assert.deepStrictEqual(state.players, ['A', 'B', 'C']);
+
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'bank' }, seats), 'Roll first: there is nothing to bank.');
+  assert.strictEqual(pig.applyMove(state, 'B', { action: 'roll' }, seats), 'Not your turn.');
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'roll' }, seats, [3, 4]), null);
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'roll' }, seats, [6, 6]), null);
+  assert.strictEqual(pig.viewFor(state, 'A', seats).pot, 19);
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'bank' }, seats), null);
+  assert.strictEqual(state.scores.A, 19);
+  assert.strictEqual(state.turn, 'B');
+
+  // One pig loses the pot and keeps the score; the turn passes.
+  state.scores.B = 30;
+  assert.strictEqual(pig.applyMove(state, 'B', { action: 'roll' }, seats, [5, 5]), null);
+  assert.strictEqual(pig.applyMove(state, 'B', { action: 'roll' }, seats, [1, 5]), null);
+  assert.strictEqual(state.scores.B, 30);
+  assert.strictEqual(state.turn, 'C');
+  assert.strictEqual(state.lastAction.result, 'bust');
+  assert.strictEqual(state.lastAction.lost, 10);
+
+  // Two pigs wipe the score as well.
+  state.scores.C = 44;
+  assert.strictEqual(pig.applyMove(state, 'C', { action: 'roll' }, seats, [1, 1]), null);
+  assert.strictEqual(state.scores.C, 0);
+  assert.strictEqual(state.turn, 'A');
+
+  // A roll sent by a player is ignored: only the fifth argument sets the dice.
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'roll', dice: [6, 6] }, seats, [2, 2]), null);
+  assert.deepStrictEqual(state.dice, [2, 2]);
+
+  // Banking to 100 wins.
+  state.scores.A = 97;
+  assert.strictEqual(pig.viewFor(state, 'A', seats).players[0].name, 'Ann');
+  assert.strictEqual(pig.applyMove(state, 'A', { action: 'bank' }, seats), null);
+  assert.strictEqual(state.phase, 'over');
+  assert.strictEqual(state.winner, 'A');
+  // The computer banks a pot that wins.
+  const close = pig.init();
+  ['A', 'B'].forEach(slot => pig.onPlayerJoined(close, slot));
+  pig.applyMove(close, 'A', { action: 'start' }, seats);
+  close.scores.A = 96; close.pot = 4;
+  for (const level of ['easy', 'normal', 'hard']) assert.deepStrictEqual(pig.computerMove(close, 'A', level), { action: 'bank' });
+}
+
 // Every skill level must play only legal moves and finish a game.
 function testBotLevelsPlayLegalGames() {
   const two = [{ slot: 'A', name: 'A' }, { slot: 'B', name: 'B' }];
   const setups = {
     battleship: (g, s) => { g.validateSetup(s, 'A', g.computerSetup()); g.validateSetup(s, 'B', g.computerSetup()); },
     onecard: (g, s) => { ['A', 'B'].forEach(x => g.onPlayerJoined(s, x)); g.applyMove(s, 'A', { action: 'start' }, two); },
+    pig: (g, s) => { ['A', 'B'].forEach(x => g.onPlayerJoined(s, x)); g.applyMove(s, 'A', { action: 'start' }, two); },
   };
-  for (const id of ['battleship', 'connectfour', 'dotsboxes', 'mancala', 'onecard', 'ultimatettt']) {
+  for (const id of ['battleship', 'connectfour', 'dotsboxes', 'mancala', 'onecard', 'ultimatettt', 'reversi', 'checkers', 'pig']) {
     const game = require(`../public/games/${id}`);
     for (const [a, b] of [['easy', 'hard'], ['hard', 'normal'], ['normal', 'easy'], [undefined, 'bogus']]) {
       const levels = { A: a, B: b };
@@ -370,6 +504,9 @@ async function main() {
   testMancalaMoveIdentity();
   testDotsBoxesScoring();
   testBattleshipCanonicalCells();
+  testReversiFlipsAndPasses();
+  testCheckersJumpsAndKings();
+  testPigPotsAndPigs();
   testBotLevelsPlayLegalGames();
   testPushEncryptionVector();
   const fakePush = await startFakePush();
@@ -589,7 +726,7 @@ async function main() {
     assert.strictEqual(botAfterMove.data.view.turn, 'A');
     assert.strictEqual(botAfterMove.data.view.board.flat().filter(Boolean).length, 2);
 
-    for (const game of ['battleship', 'dotsboxes', 'mancala', 'onecard', 'ultimatettt']) {
+    for (const game of ['battleship', 'dotsboxes', 'mancala', 'onecard', 'ultimatettt', 'reversi', 'checkers', 'pig']) {
       const availableBot = await request(port, 'POST', '/api/create', {
         game,
         name: 'Human',
